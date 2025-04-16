@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs } from 'expo-r outer';
 import {
   Chrome as Home,
   ChartBar as BarChart2,
