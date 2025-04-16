@@ -1,11 +1,10 @@
-import { Tabs } from 'expo-r outer';
+import { Tabs } from 'expo-router';
 import {
   Chrome as Home,
   ChartBar as BarChart2,
   QrCode,
   Gift,
   User,
-  Bell,
 } from 'lucide-react-native';
 
 export default function TabLayout() {
@@ -50,17 +49,6 @@ export default function TabLayout() {
         options={{
           title: 'Rewards',
           tabBarIcon: ({ color, size }) => <Gift color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: 'Notifications',
-          tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
-          tabBarBadge: '3',
-          tabBarBadgeStyle: {
-            backgroundColor: '#8e44ad',
-          },
         }}
       />
       <Tabs.Screen

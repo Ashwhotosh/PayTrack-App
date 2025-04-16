@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
-import { QrCode, X as XIcon, Camera as FlipCamera } from 'lucide-react-native';
+import { QrCode, Flashlight } from 'lucide-react-native';
 
 export default function ScanPage() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [type, setType] = useState<'front' | 'back'>('back');
+  const [torch, setTorch] = useState<'on' | 'off'>('off');
 
   useEffect(() => {
     (async () => {
@@ -17,6 +17,10 @@ export default function ScanPage() {
   const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
     // TODO: Implement QR code payment logic
     console.log(`Bar code with type ${type} and data ${data} has been scanned!`);
+  };
+
+  const toggleTorch = () => {
+    setTorch(current => (current === 'on' ? 'off' : 'on'));
   };
 
   if (Platform.OS === 'web') {
@@ -54,8 +58,9 @@ export default function ScanPage() {
     native: () => (
       <CameraView
         style={styles.camera}
-        type={type}
+        type="back"
         onBarCodeScanned={handleBarCodeScanned}
+        torch={torch}
       >
         <View style={styles.overlay}>
           <View style={styles.scanArea}>
@@ -65,6 +70,16 @@ export default function ScanPage() {
             <View style={[styles.corner, styles.bottomRight]} />
           </View>
           <Text style={styles.scanText}>Align QR code within frame</Text>
+          
+          <TouchableOpacity 
+            style={styles.torchButton}
+            onPress={toggleTorch}
+          >
+            <Flashlight color={torch === 'on' ? '#8e44ad' : '#fff'} size={24} />
+            <Text style={[styles.buttonText, torch === 'on' && styles.activeButtonText]}>
+              {torch === 'on' ? 'Torch On' : 'Torch Off'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </CameraView>
     ),
@@ -80,21 +95,6 @@ export default function ScanPage() {
 
       <View style={styles.cameraContainer}>
         {CameraComponent()}
-      </View>
-
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={styles.controlButton}
-          onPress={() => setType(type === 'back' ? 'front' : 'back')}
-        >
-          <FlipCamera color="#fff" size={24} />
-          <Text style={styles.buttonText}>Flip</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.controlButton}>
-          <XIcon color="#fff" size={24} />
-          <Text style={styles.buttonText}>Cancel</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -183,24 +183,23 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontFamily: 'Inter-Regular',
   },
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    padding: 20,
-    gap: 20,
-  },
-  controlButton: {
+  torchButton: {
     backgroundColor: '#2a2a2a',
-    padding: 16,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    width: 100,
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 32,
   },
   buttonText: {
     color: '#fff',
     fontSize: 14,
-    marginTop: 8,
     fontFamily: 'Inter-Regular',
+  },
+  activeButtonText: {
+    color: '#8e44ad',
   },
   webPlaceholder: {
     flex: 1,

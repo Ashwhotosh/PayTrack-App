@@ -57,7 +57,7 @@ export default function HomePage() {
   };
 
   const handleViewAllTransactions = () => {
-    router.push('/transactions');
+    router.push('/(tabs)/analytics');
   };
 
   return (
