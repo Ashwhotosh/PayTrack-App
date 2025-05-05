@@ -40,7 +40,7 @@ const mockData = {
 };
 
 const paymentMethods = [
-  { id: 1, name: 'UPI', icon: QrCode },
+  { id: 1, name: 'UPI', icon: QrCode, route: '/upi-payment' },
   { id: 2, name: 'Credit Card', icon: CreditCard },
   { id: 3, name: 'Wallet', icon: Wallet },
   { id: 4, name: 'Bank', icon: Bank },
@@ -58,6 +58,12 @@ export default function HomePage() {
 
   const handleViewAllTransactions = () => {
     router.push('/(tabs)/analytics');
+  };
+
+  const handlePaymentMethodPress = (route?: string) => {
+    if (route) {
+      router.push(route);
+    }
   };
 
   return (
@@ -110,7 +116,11 @@ export default function HomePage() {
         <Text style={styles.sectionTitle}>Payment Methods</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.methodsScroll}>
           {paymentMethods.map((method) => (
-            <TouchableOpacity key={method.id} style={styles.methodCard}>
+            <TouchableOpacity 
+              key={method.id} 
+              style={styles.methodCard}
+              onPress={() => handlePaymentMethodPress(method.route)}
+            >
               <method.icon color="#8e44ad" size={24} />
               <Text style={styles.methodName}>{method.name}</Text>
             </TouchableOpacity>
