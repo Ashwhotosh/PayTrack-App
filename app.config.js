@@ -3,6 +3,7 @@ export default {
   expo: {
     name: "TrackPay",
     slug: "TrackPay-slug",
+    owner: "niggadevs",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
