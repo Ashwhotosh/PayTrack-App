@@ -1,3 +1,4 @@
+// app/profile/help-support.tsx
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { CircleHelp as HelpCircle, MessageCircle, Phone, Mail, ChevronDown, ChevronRight } from 'lucide-react-native';
 

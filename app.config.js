@@ -2,15 +2,16 @@
 export default {
   expo: {
     name: "TrackPay",
-    slug: "TrackPay-slug", 
+    slug: "TrackPay-slug",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "myapp",
+    scheme: "myapp", // This is your app's scheme
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     ios: {
-      supportsTablet: true
+      supportsTablet: true,
+      // Add associated domains for iOS if needed for Universal Links, though deep schemes are simpler for UPI callbacks
     },
     web: {
       bundler: "metro",
@@ -18,7 +19,21 @@ export default {
       favicon: "./assets/images/favicon.png"
     },
     android: {
-      package: "com.ashutoshsingh.TrackPay" // Replace this with your unique package name
+      package: "com.ashutoshsingh.TrackPay", // Your unique package name
+      intentFilters: [
+        {
+          action: "VIEW",
+          autoVerify: true, // Optional: for Android App Links
+          data: [
+            {
+              scheme: "myapp", // Must match your app's scheme
+              host: "upi",     // This will handle myapp://upi/...
+              // pathPrefix: "/payment" // You can be more specific if needed, e.g., myapp://upi/payment
+            }
+          ],
+          category: ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     plugins: ["expo-router"],
     experiments: {

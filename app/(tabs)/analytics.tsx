@@ -1,3 +1,4 @@
+// app/(tabs)/analytics.tsx
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Image } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';

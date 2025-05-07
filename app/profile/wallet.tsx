@@ -1,3 +1,4 @@
+// app/profile/wallet.tsx
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Wallet, ArrowUpRight, ArrowDownLeft, History, Plus } from 'lucide-react-native';

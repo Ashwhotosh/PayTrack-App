@@ -1,3 +1,4 @@
+// app/profile/security.tsx
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { 
   Shield,

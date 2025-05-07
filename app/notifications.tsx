@@ -1,3 +1,4 @@
+// app/notifications.tsx
 import { useState, useCallback } from 'react';
 import {
   View,

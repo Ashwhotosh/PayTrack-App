@@ -1,3 +1,4 @@
+// app/(tabs)/profile.tsx
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Image } from 'react-native';
 import { router } from 'expo-router';
 import { User, Bell, CreditCard, Shield, CircleHelp as HelpCircle, Moon, Fingerprint, LogOut, ChevronRight, Wallet } from 'lucide-react-native';

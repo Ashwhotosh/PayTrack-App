@@ -1,12 +1,15 @@
+// app/(tabs)/scan.tsx
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { CameraView, Camera } from 'expo-camera';
-import { router } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert } from 'react-native';
+import { CameraView, Camera } from 'expo-camera'; // Camera should be imported if Camera.requestCameraPermissionsAsync is used.
+import { router, useFocusEffect } from 'expo-router'; // Import useFocusEffect
 import { QrCode, X as XIcon, Camera as FlipCamera } from 'lucide-react-native';
+import { useCallback } from 'react'; // Import useCallback
 
 export default function ScanPage() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [type, setType] = useState<'front' | 'back'>('back');
+  const [facing, setFacing] = useState<'front' | 'back'>('back');
+  const [scanned, setScanned] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -15,20 +18,43 @@ export default function ScanPage() {
     })();
   }, []);
 
+  // Use useFocusEffect to reset 'scanned' state when the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setScanned(false); // Allow scanning when the screen is focused
+      return () => {
+        // Optional: cleanup if needed when screen loses focus,
+        // for this simple case, not much is needed here.
+        // setScanned(true); // You might want to set it to true if you only want one scan per focus.
+      };
+    }, [])
+  );
+
   const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
-    // Extract UPI ID from QR code data
+    if (scanned) { // Check if already processed a scan in this focus session or if an alert is up
+      return;
+    }
+    setScanned(true); // Mark as scanned to prevent multiple triggers immediately
+
     const upiMatch = data.match(/pa=([^&]+)/);
-    const upiId = upiMatch ? decodeURIComponent(upiMatch[1]) : null;
+    const upiId = upiMatch && upiMatch[1] ? decodeURIComponent(upiMatch[1]) : null;
 
     if (upiId) {
       router.push({
         pathname: '/upi-payment',
         params: { upiId }
       });
+      // 'scanned' will be reset by useFocusEffect if the user navigates back
     } else {
-      console.log(`Bar code with type ${type} and data ${data} has been scanned!`);
+      console.log(`Bar code with type ${type} and data ${data} has been scanned, but no UPI ID found.`);
+      Alert.alert(
+        "Invalid QR Code",
+        "The scanned QR code does not appear to be a valid UPI QR code. Please try a different one.",
+        [{ text: "OK", onPress: () => setScanned(false) }] // Allow another scan immediately after dismissing alert
+      );
     }
   };
+
 
   if (Platform.OS === 'web') {
     return (
@@ -56,31 +82,31 @@ export default function ScanPage() {
   if (hasPermission === false) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>No access to camera</Text>
+        <Text style={styles.message}>No access to camera. Please enable it in settings.</Text>
       </View>
     );
   }
 
-  const CameraComponent = Platform.select({
-    native: () => (
-      <CameraView
-        style={styles.camera}
-        type={type}
-        onBarCodeScanned={handleBarCodeScanned}
-      >
-        <View style={styles.overlay}>
-          <View style={styles.scanArea}>
-            <View style={[styles.corner, styles.topLeft]} />
-            <View style={[styles.corner, styles.topRight]} />
-            <View style={[styles.corner, styles.bottomLeft]} />
-            <View style={[styles.corner, styles.bottomRight]} />
-          </View>
-          <Text style={styles.scanText}>Align QR code within frame</Text>
+  const CameraComponent = () => (
+    <CameraView
+      style={styles.camera}
+      facing={facing}
+      onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+      barcodeScannerSettings={{
+        barcodeTypes: ["qr"],
+      }}
+    >
+      <View style={styles.overlay}>
+        <View style={styles.scanArea}>
+          <View style={[styles.corner, styles.topLeft]} />
+          <View style={[styles.corner, styles.topRight]} />
+          <View style={[styles.corner, styles.bottomLeft]} />
+          <View style={[styles.corner, styles.bottomRight]} />
         </View>
-      </CameraView>
-    ),
-    default: () => null,
-  });
+        <Text style={styles.scanText}>Align QR code within frame</Text>
+      </View>
+    </CameraView>
+  );
 
   return (
     <View style={styles.container}>
@@ -90,21 +116,24 @@ export default function ScanPage() {
       </View>
 
       <View style={styles.cameraContainer}>
-        {CameraComponent()}
+        <CameraComponent />
       </View>
 
       <View style={styles.controls}>
         <TouchableOpacity
           style={styles.controlButton}
-          onPress={() => setType(type === 'back' ? 'front' : 'back')}
+          onPress={() => setFacing(prevFacing => prevFacing === 'back' ? 'front' : 'back')}
         >
           <FlipCamera color="#fff" size={24} />
           <Text style={styles.buttonText}>Flip</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.controlButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            // setScanned(false); // Not strictly needed here as useFocusEffect will handle reset on return
+            router.back();
+          }}
         >
           <XIcon color="#fff" size={24} />
           <Text style={styles.buttonText}>Cancel</Text>
@@ -123,7 +152,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'android' ? 40 : 60,
     gap: 12,
   },
   title: {
@@ -156,38 +185,36 @@ const styles = StyleSheet.create({
   scanArea: {
     width: 250,
     height: 250,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
     position: 'relative',
   },
   corner: {
     position: 'absolute',
-    width: 20,
-    height: 20,
+    width: 30,
+    height: 30,
     borderColor: '#8e44ad',
-    borderWidth: 3,
+    borderWidth: 4,
   },
   topLeft: {
-    top: -2,
-    left: -2,
+    top: 0,
+    left: 0,
     borderBottomWidth: 0,
     borderRightWidth: 0,
   },
   topRight: {
-    top: -2,
-    right: -2,
+    top: 0,
+    right: 0,
     borderBottomWidth: 0,
     borderLeftWidth: 0,
   },
   bottomLeft: {
-    bottom: -2,
-    left: -2,
+    bottom: 0,
+    left: 0,
     borderTopWidth: 0,
     borderRightWidth: 0,
   },
   bottomRight: {
-    bottom: -2,
-    right: -2,
+    bottom: 0,
+    right: 0,
     borderTopWidth: 0,
     borderLeftWidth: 0,
   },
@@ -196,19 +223,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 20,
     fontFamily: 'Inter-Regular',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
   },
   controls: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
     padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
     gap: 20,
   },
   controlButton: {
     backgroundColor: '#2a2a2a',
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: 'center',
-    width: 100,
+    minWidth: 120,
   },
   buttonText: {
     color: '#fff',

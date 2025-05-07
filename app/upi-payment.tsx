@@ -1,3 +1,4 @@
+// app/upi-payment.tsx
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,6 +10,15 @@ interface ValidationErrors {
   amount?: string;
 }
 
+// Define a type for the UPI callback parameters
+interface UpiCallbackParams {
+  status?: string;
+  txnId?: string;
+  responseCode?: string;
+  txnRef?: string; // Sometimes 'txnRef' or 'tr' is used for transaction reference
+  [key: string]: string | undefined; // Allow other potential parameters
+}
+
 export default function UpiPaymentScreen() {
   const params = useLocalSearchParams();
   const [upiId, setUpiId] = useState('');
@@ -16,12 +26,76 @@ export default function UpiPaymentScreen() {
   const [note, setNote] = useState('');
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentStatusInfo, setPaymentStatusInfo] = useState<string | null>(null);
+
+  // Your app's scheme and callback path
+  const APP_SCHEME = "myapp";
+  const UPI_CALLBACK_PATH = "upi/payment"; // e.g., myapp://upi/payment
 
   useEffect(() => {
     if (params.upiId) {
       setUpiId(params.upiId as string);
     }
   }, [params.upiId]);
+
+  // Effect to handle deep linking for UPI callback
+  useEffect(() => {
+    const handleDeepLink = (event: { url: string } | null) => {
+      if (!event || !event.url) {
+        return;
+      }
+
+      const parsedUrl = Linking.parse(event.url);
+      console.log('Parsed Deep Link URL:', JSON.stringify(parsedUrl, null, 2));
+
+      // Check if the deep_link is for a UPI payment callback
+      // The hostname might be 'upi' and path 'payment' if your data scheme is 'myapp://upi/payment'
+      // Or path could be 'upi/payment' if hostname is null from parse.
+      // Let's check for scheme and path
+      if (parsedUrl.scheme === APP_SCHEME && parsedUrl.path === UPI_CALLBACK_PATH) {
+        const queryParams = parsedUrl.queryParams as UpiCallbackParams | null;
+
+        if (queryParams) {
+          const status = queryParams.status || queryParams.Status;
+          const txnId = queryParams.txnId || queryParams.TransactionId;
+          const responseCode = queryParams.responseCode || queryParams.txnRef; // txnRef might be the original transaction ID
+
+          let message = `Payment Status: ${status || 'N/A'}\n`;
+          message += `Transaction ID: ${txnId || 'N/A'}\n`;
+          message += `Response Code: ${responseCode || 'N/A'}`;
+
+          setPaymentStatusInfo(message); // Update state to show info on screen
+          Alert.alert('UPI Payment Callback', message);
+
+          // You can navigate to a payment status screen or update UI accordingly
+          // For example:
+          // router.replace({
+          //   pathname: '/payment-status',
+          //   params: { status, txnId, responseCode }
+          // });
+        } else {
+          Alert.alert('UPI Payment Callback', 'Received callback but no parameters found.');
+        }
+      } else {
+        console.log("Received URL that is not a UPI callback:", event.url);
+      }
+    };
+
+    // Listen for incoming deep links
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Check for initial URL (if app was opened via deep link)
+    Linking.getInitialURL().then(url => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    }).catch(err => console.error('Error getting initial URL:', err));
+
+    // Cleanup listener on unmount
+    return () => {
+      subscription.remove();
+    };
+  }, []); // Empty dependency array ensures this runs once on mount
 
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
@@ -48,21 +122,34 @@ export default function UpiPaymentScreen() {
     }
 
     setIsProcessing(true);
+    setPaymentStatusInfo(null); // Clear previous status
 
     try {
       // Construct UPI URI with all required parameters
       let upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}`;
-      upiUri += `&pn=Recipient`; // Generic payee name
+      upiUri += `&pn=Recipient Name`; // Payee Name (Mandatory) - Use a placeholder or actual name
       upiUri += `&am=${encodeURIComponent(amount)}`;
       upiUri += `&cu=INR`; // Currency code for Indian Rupee
 
       if (note) {
-        upiUri += `&tn=${encodeURIComponent(note)}`;
+        upiUri += `&tn=${encodeURIComponent(note)}`; // Transaction Note (Optional)
       }
 
-      // Add transaction reference
-      const transactionRefId = `PayApp_${Date.now()}`;
-      upiUri += `&tr=${encodeURIComponent(transactionRefId)}`;
+      // Transaction Reference ID (Mandatory for some PSPs, good practice)
+      //This tr should be unique for each transaction.
+      const transactionRefId = `TrackPay_${Date.now()}`;
+      upiUri += `&tr=${encodeURIComponent(transactionRefId)}`; // Merchant Transaction Reference ID
+
+
+      // *** Add your app's callback URL ***
+      const callbackUrl = `${APP_SCHEME}://${UPI_CALLBACK_PATH}`; // e.g., myapp://upi/payment
+      upiUri += `&url=${encodeURIComponent(callbackUrl)}`;
+
+      // Optional: Merchant Code (mc) if you have one and it's needed by the QR or PSP
+      // upiUri += `&mc=YOUR_MERCHANT_CODE`;
+
+      console.log("Attempting to open UPI URI:", upiUri);
+
 
       if (Platform.OS === 'web') {
         Alert.alert(
@@ -70,6 +157,7 @@ export default function UpiPaymentScreen() {
           'UPI payments are only supported on mobile devices. Please use the mobile app.',
           [{ text: 'OK' }]
         );
+        setIsProcessing(false);
         return;
       }
 
@@ -77,12 +165,16 @@ export default function UpiPaymentScreen() {
       
       if (supported) {
         await Linking.openURL(upiUri);
+        // Note: App will go to background. The callback will bring it to foreground.
+        // setIsProcessing might not be reset here if navigation is immediate.
+        // Status will be handled by the deep link listener.
       } else {
         Alert.alert(
           'UPI App Not Found',
-          'Please install a UPI-enabled payment app to proceed.',
+          'No UPI app is installed or available to handle the payment. Please install a UPI-enabled payment app to proceed.',
           [{ text: 'OK' }]
         );
+        setIsProcessing(false);
       }
     } catch (error) {
       console.error('Error opening UPI URI:', error);
@@ -91,9 +183,12 @@ export default function UpiPaymentScreen() {
         'Could not initiate UPI payment. Please try again.',
         [{ text: 'OK' }]
       );
-    } finally {
       setIsProcessing(false);
     }
+    // We don't set setIsProcessing(false) here if openURL is successful,
+    // as the app will switch and the callback listener will handle the result.
+    // If openURL fails immediately, then we should reset it.
+    // The 'supported' check handles the case where no app is found. For other errors, it's already in catch.
   };
 
   return (
@@ -164,6 +259,13 @@ export default function UpiPaymentScreen() {
           />
         </View>
 
+        {paymentStatusInfo && (
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusTitle}>Payment Update:</Text>
+            <Text style={styles.statusText}>{paymentStatusInfo}</Text>
+          </View>
+        )}
+
         <TouchableOpacity 
           style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
           onPress={initiateUpiPayment}
@@ -179,6 +281,7 @@ export default function UpiPaymentScreen() {
   );
 }
 
+// Add new styles for status display, or modify existing ones
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -188,7 +291,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 60, // Adjusted for typical status bar height
     gap: 16,
   },
   title: {
@@ -229,7 +332,8 @@ const styles = StyleSheet.create({
   },
   inputWithIcon: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 16, // Ensure consistent padding with other inputs
+    paddingLeft: 8, // Add some space from the icon
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
@@ -262,5 +366,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
+  },
+  // Styles for displaying payment status
+  statusContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#8e44ad',
+  },
+  statusTitle: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 5,
+  },
+  statusText: {
+    fontSize: 14,
+    color: '#ddd',
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
   },
 });

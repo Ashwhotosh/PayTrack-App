@@ -1,3 +1,4 @@
+// app/profile/payment-methods.tsx
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
 import { 

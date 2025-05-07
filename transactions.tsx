@@ -1,3 +1,4 @@
+// transactions.tsx
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Search, Filter, ChevronDown } from 'lucide-react-native';

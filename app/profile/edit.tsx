@@ -1,3 +1,4 @@
+// app/profile/edit.tsx
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Platform } from 'react-native';
 import { router } from 'expo-router';

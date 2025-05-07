@@ -1,3 +1,4 @@
+// app/(auth)/profile-setup.tsx
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
 import { router } from 'expo-router';

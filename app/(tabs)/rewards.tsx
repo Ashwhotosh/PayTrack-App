@@ -1,3 +1,4 @@
+// app/(tabs)/rewards.tsx
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Gift, Ticket, CreditCard, Coins } from 'lucide-react-native';
 

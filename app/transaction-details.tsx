@@ -1,3 +1,4 @@
+// app/transaction-details.tsx
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ArrowLeft, Receipt, Share2, Download, Flag } from 'lucide-react-native';
