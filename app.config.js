@@ -1,42 +1,47 @@
 // app.config.js
+// This file is the single source of truth for your app's configuration.
+
 export default {
   expo: {
     name: "TrackPay",
     slug: "TrackPay-slug",
-    owner: "niggadevs",
+    owner: "niggadevs", // Crucial for EAS project linking
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "myapp", // This is your app's scheme
+    scheme: "myapp",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
+
     ios: {
       supportsTablet: true,
-      // Add associated domains for iOS if needed for Universal Links, though deep schemes are simpler for UPI callbacks
     },
     web: {
       bundler: "metro",
       output: "single",
-      favicon: "./assets/images/favicon.png"
+      favicon: "./assets/images/favicon.png",
     },
     android: {
-      package: "com.ashutoshsingh.TrackPay", // Your unique package name
+      package: "com.ashutoshsingh.TrackPay",
       intentFilters: [
         {
           action: "VIEW",
-          autoVerify: true, // Optional: for Android App Links
+          autoVerify: true, // This is for your app link (myapp://upi)
           data: [
             {
-              scheme: "myapp", // Must match your app's scheme
-              host: "upi",     // This will handle myapp://upi/...
-              // pathPrefix: "/payment" // You can be more specific if needed, e.g., myapp://upi/payment
+              scheme: "myapp",
+              host: "upi",
             }
           ],
           category: ["BROWSABLE", "DEFAULT"]
         }
-      ]
+      ],
+      // The <queries> for UPI will be added by the config plugin
     },
-    plugins: ["expo-router"],
+    plugins: [
+      "expo-router",
+      "./withUPIQueries.js" // Path to your custom config plugin
+    ],
     experiments: {
       typedRoutes: true
     },
