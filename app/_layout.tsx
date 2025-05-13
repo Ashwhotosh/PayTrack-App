@@ -1,21 +1,19 @@
 // app/_layout.tsx
 import { useEffect } from 'react';
-import { Stack, SplashScreen, useRouter } from 'expo-router'; // Import SplashScreen, useRouter
+import { Slot, SplashScreen, Stack, useRouter, useSegments } from 'expo-router'; // Import useRouter, useSegments
 import { StatusBar } from 'expo-status-bar';
-// import { useFrameworkReady } from '@/hooks/useFrameworkReady'; // Assuming this can be simplified or handled differently
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-// Import your auth context or state management here if you have one
-// For example: import { useAuth } from '@/context/AuthContext';
+import { ApolloProvider } from '@apollo/client';
+import client from '@/lib/apolloClient';
+import { AuthProvider, useAuth } from '@/context/authContext'; // Import AuthProvider and useAuth
+import { ActivityIndicator, View } from 'react-native'; // For loading indicator
+
+export { ErrorBoundary } from 'expo-router';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  // const { isAuthenticated, isLoading: authIsLoading } = useAuth(); // Example auth state
-  const router = useRouter();
-
-  // const { isReady } = useFrameworkReady(); // If this hook is for general readiness
-
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-SemiBold': Inter_600SemiBold,
@@ -23,63 +21,74 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // if (isReady && (fontsLoaded || fontError) && !authIsLoading) { // Example with more checks
-    if (fontsLoaded || fontError) { // Simplified: hide splash when fonts are ready
+    if (fontError) throw fontError;
+  }, [fontError]);
+
+  // Hide splash screen once fonts are loaded OR if there's a font error (to show error boundary)
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]); // Add other dependencies like isReady, authIsLoading if used
-
-  // ---- START: Optional - Automatic Auth Redirect Logic ----
-  // This is a common pattern. If you handle this differently (e.g., initialRouteName or manually), adapt or remove.
-  // For this to work, you'd need an `isAuthenticated` state.
-  // const isAuthenticated = false; // Replace with your actual auth state
-  // const authChecked = true; // Replace with a state that confirms auth check has completed
-
-  // useEffect(() => {
-  //   if (!fontsLoaded || !authChecked) { // Ensure fonts are loaded and auth status is known
-  //     return;
-  //   }
-
-  //   if (isAuthenticated) {
-  //     // User is authenticated, ensure they are in the main app part
-  //     router.replace('/(tabs)'); // Go to the home tab or any default screen in (tabs)
-  //   } else {
-  //     // User is not authenticated, ensure they are in the auth flow
-  //     router.replace('/(auth)/phone-login'); // Go to login
-  //   }
-  // }, [isAuthenticated, authChecked, fontsLoaded, router]);
-  // ---- END: Optional - Automatic Auth Redirect Logic ----
+  }, [fontsLoaded, fontError]);
 
 
   if (!fontsLoaded && !fontError) {
-    return null; // Return null while fonts are loading to keep splash screen visible
+    return null; // Keep splash screen visible
   }
 
-  // If you have the auth redirect logic above, the Stack below just defines available routes.
-  // If not, the initial route will be determined by Expo Router's conventions (e.g. first screen).
+  return (
+    <ApolloProvider client={client}>
+      <AuthProvider>
+        <LayoutController />
+      </AuthProvider>
+    </ApolloProvider>
+  );
+}
+
+function LayoutController() {
+  const { token, isLoading, isAppLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isAppLoading || isLoading) return; // Still determining auth state or loading initial user
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (token && !inAuthGroup) {
+      // User is authenticated but not in an auth screen (e.g., deep link to auth while logged in)
+      // Or, initial load and token found, redirect to tabs
+      router.replace('/(tabs)');
+    } else if (!token && !inAuthGroup) {
+      // User is not authenticated and not in an auth screen, redirect to login
+      router.replace('/(auth)/login');
+    }
+  }, [token, segments, isLoading, router, isAppLoading]);
+
+  // Show a global loading indicator while checking auth state or initial user fetch
+  if (isAppLoading || isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
+        <ActivityIndicator size="large" color="#8e44ad" />
+      </View>
+    );
+  }
+
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
-        {/* Group for authentication screens */}
-        <Stack.Screen name="(auth)" />
-
-        {/* Group for main app tab screens */}
-        <Stack.Screen name="(tabs)" />
-
-        {/* Group for profile stack screens (e.g., edit profile, wallet) */}
-        {/* This is correctly defined as a directory `app/profile/` with its own `_layout.tsx` */}
-        <Stack.Screen name="profile" /> 
-        
-        {/* Individual top-level screens, presented in the root stack */}
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="payment-success" />
         <Stack.Screen name="transaction-details" />
-        <Stack.Screen name="transactions" />
         <Stack.Screen name="upi-payment" />
-        
-        {/* +not-found is handled by convention, no need to list it as a Stack.Screen here */}
-        {/* <Stack.Screen name="+not-found" /> */}
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="light" />
     </>
   );
+  // Alternatively, use <Slot /> if you want expo-router to manage the stack based on auth state more directly
+  // return <Slot />;
 }
