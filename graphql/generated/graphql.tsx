@@ -316,22 +316,26 @@ export type SignupInput = {
 export type Transaction = {
   __typename?: 'Transaction';
   amount: Scalars['Decimal']['output'];
-  /** Details specific to a Card transaction (null if not Card). */
   cardDetails?: Maybe<CardTransaction>;
   category?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
+  flow: TransactionFlow;
   id: Scalars['ID']['output'];
-  /** Details specific to a NetBanking transaction (null if not NetBanking). */
   netBankingDetails?: Maybe<NetBankingTransaction>;
   notes?: Maybe<Scalars['String']['output']>;
   payer: User;
   timestamp: Scalars['DateTime']['output'];
   transactionType: TransactionType;
   updatedAt: Scalars['DateTime']['output'];
-  /** Details specific to a UPI transaction (null if not UPI). */
   upiDetails?: Maybe<UpiTransaction>;
   userId: Scalars['ID']['output'];
 };
+
+/** Indicates the direction of money flow relative to the user. */
+export enum TransactionFlow {
+  Credit = 'CREDIT',
+  Debit = 'DEBIT'
+}
 
 /** Types of supported financial transactions. */
 export enum TransactionType {
@@ -462,14 +466,14 @@ export type UpdateTransactionCategoryMutationVariables = Exact<{
 }>;
 
 
-export type UpdateTransactionCategoryMutation = { __typename?: 'Mutation', updateTransactionCategory: { __typename?: 'Transaction', id: string, category?: string | null, amount: any, notes?: string | null, timestamp: any, upiDetails?: { __typename?: 'UPITransaction', id: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string } | null } };
+export type UpdateTransactionCategoryMutation = { __typename?: 'Mutation', updateTransactionCategory: { __typename?: 'Transaction', id: string, category?: string | null, amount: any, notes?: string | null, timestamp: any, transactionType: TransactionType, flow: TransactionFlow, upiDetails?: { __typename?: 'UPITransaction', id: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string } | null } };
 
 export type CreateTransactionMutationVariables = Exact<{
   input: CreateTransactionInput;
 }>;
 
 
-export type CreateTransactionMutation = { __typename?: 'Mutation', createTransaction: { __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, notes?: string | null, timestamp: any, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeUpiId: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string } | null } };
+export type CreateTransactionMutation = { __typename?: 'Mutation', createTransaction: { __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, flow: TransactionFlow, notes?: string | null, timestamp: any, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeUpiId: string, payeeName: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string, payeeBankName: string, referenceId: string } | null } };
 
 export type GetRealtimeCategorySuggestionQueryVariables = Exact<{
   transactionId: Scalars['ID']['input'];
@@ -491,7 +495,17 @@ export type GetAnalyticsTransactionsQueryVariables = Exact<{
 }>;
 
 
-export type GetAnalyticsTransactionsQuery = { __typename?: 'Query', transactions: Array<{ __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, timestamp: any, category?: string | null, notes?: string | null, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeName: string, payeeUpiId: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string } | null }> };
+export type GetAnalyticsTransactionsQuery = { __typename?: 'Query', transactions: Array<{ __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, flow: TransactionFlow, timestamp: any, category?: string | null, notes?: string | null, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeName: string, payeeUpiId: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string } | null }> };
+
+export type GetDashboardTransactionsQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  dateFrom?: InputMaybe<Scalars['DateTime']['input']>;
+  dateTo?: InputMaybe<Scalars['DateTime']['input']>;
+}>;
+
+
+export type GetDashboardTransactionsQuery = { __typename?: 'Query', transactions: Array<{ __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, flow: TransactionFlow, timestamp: any, category?: string | null, notes?: string | null, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeName: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string } | null }> };
 
 export type GetCategorySpendingSummaryQueryVariables = Exact<{
   dateFrom?: InputMaybe<Scalars['DateTime']['input']>;
@@ -506,7 +520,7 @@ export type GetTransactionDetailsQueryVariables = Exact<{
 }>;
 
 
-export type GetTransactionDetailsQuery = { __typename?: 'Query', transaction?: { __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, timestamp: any, notes?: string | null, category?: string | null, createdAt: any, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeName: string, payeeUpiId: string, payerUpiAccount: { __typename?: 'UserUpiAccount', id: string, displayName: string, upiId: string } } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string, payerCardAccount: { __typename?: 'UserCardAccount', id: string, cardLast4Digits: string, cardType: string } } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string, payeeBankName: string, referenceId: string, payerBankAccount: { __typename?: 'UserBankAccount', id: string, bankName: string, accountNumberLast4: string } } | null } | null };
+export type GetTransactionDetailsQuery = { __typename?: 'Query', transaction?: { __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, flow: TransactionFlow, timestamp: any, notes?: string | null, category?: string | null, createdAt: any, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeName: string, payeeUpiId: string, payerUpiAccount: { __typename?: 'UserUpiAccount', id: string, displayName: string, upiId: string } } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string, payerCardAccount: { __typename?: 'UserCardAccount', id: string, cardLast4Digits: string, cardType: string } } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string, payeeBankName: string, referenceId: string, payerBankAccount: { __typename?: 'UserBankAccount', id: string, bankName: string, accountNumberLast4: string } } | null } | null };
 
 
 export const LoginDocument = gql`
@@ -685,6 +699,8 @@ export const UpdateTransactionCategoryDocument = gql`
     amount
     notes
     timestamp
+    transactionType
+    flow
     upiDetails {
       id
     }
@@ -730,17 +746,23 @@ export const CreateTransactionDocument = gql`
     id
     amount
     transactionType
+    flow
     notes
     timestamp
     upiDetails {
       id
       payeeUpiId
+      payeeName
     }
     cardDetails {
       id
+      payeeMerchantName
     }
     netBankingDetails {
       id
+      payeeName
+      payeeBankName
+      referenceId
     }
   }
 }
@@ -864,6 +886,7 @@ export const GetAnalyticsTransactionsDocument = gql`
     id
     amount
     transactionType
+    flow
     timestamp
     category
     notes
@@ -919,6 +942,72 @@ export type GetAnalyticsTransactionsQueryHookResult = ReturnType<typeof useGetAn
 export type GetAnalyticsTransactionsLazyQueryHookResult = ReturnType<typeof useGetAnalyticsTransactionsLazyQuery>;
 export type GetAnalyticsTransactionsSuspenseQueryHookResult = ReturnType<typeof useGetAnalyticsTransactionsSuspenseQuery>;
 export type GetAnalyticsTransactionsQueryResult = Apollo.QueryResult<GetAnalyticsTransactionsQuery, GetAnalyticsTransactionsQueryVariables>;
+export const GetDashboardTransactionsDocument = gql`
+    query GetDashboardTransactions($limit: Int, $offset: Int, $dateFrom: DateTime, $dateTo: DateTime) {
+  transactions(
+    limit: $limit
+    offset: $offset
+    dateFrom: $dateFrom
+    dateTo: $dateTo
+  ) {
+    id
+    amount
+    transactionType
+    flow
+    timestamp
+    category
+    notes
+    upiDetails {
+      id
+      payeeName
+    }
+    cardDetails {
+      id
+      payeeMerchantName
+    }
+    netBankingDetails {
+      id
+      payeeName
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetDashboardTransactionsQuery__
+ *
+ * To run a query within a React component, call `useGetDashboardTransactionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDashboardTransactionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDashboardTransactionsQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *      dateFrom: // value for 'dateFrom'
+ *      dateTo: // value for 'dateTo'
+ *   },
+ * });
+ */
+export function useGetDashboardTransactionsQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<GetDashboardTransactionsQuery, GetDashboardTransactionsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetDashboardTransactionsQuery, GetDashboardTransactionsQueryVariables>(GetDashboardTransactionsDocument, options);
+      }
+export function useGetDashboardTransactionsLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetDashboardTransactionsQuery, GetDashboardTransactionsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetDashboardTransactionsQuery, GetDashboardTransactionsQueryVariables>(GetDashboardTransactionsDocument, options);
+        }
+export function useGetDashboardTransactionsSuspenseQuery(baseOptions?: ApolloReactHooks.SkipToken | ApolloReactHooks.SuspenseQueryHookOptions<GetDashboardTransactionsQuery, GetDashboardTransactionsQueryVariables>) {
+          const options = baseOptions === ApolloReactHooks.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useSuspenseQuery<GetDashboardTransactionsQuery, GetDashboardTransactionsQueryVariables>(GetDashboardTransactionsDocument, options);
+        }
+export type GetDashboardTransactionsQueryHookResult = ReturnType<typeof useGetDashboardTransactionsQuery>;
+export type GetDashboardTransactionsLazyQueryHookResult = ReturnType<typeof useGetDashboardTransactionsLazyQuery>;
+export type GetDashboardTransactionsSuspenseQueryHookResult = ReturnType<typeof useGetDashboardTransactionsSuspenseQuery>;
+export type GetDashboardTransactionsQueryResult = Apollo.QueryResult<GetDashboardTransactionsQuery, GetDashboardTransactionsQueryVariables>;
 export const GetCategorySpendingSummaryDocument = gql`
     query GetCategorySpendingSummary($dateFrom: DateTime, $dateTo: DateTime) {
   categorySpendingSummary(dateFrom: $dateFrom, dateTo: $dateTo) {
@@ -967,6 +1056,7 @@ export const GetTransactionDetailsDocument = gql`
     id
     amount
     transactionType
+    flow
     timestamp
     notes
     category

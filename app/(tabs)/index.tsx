@@ -2,124 +2,143 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
-import { QrCode, CreditCard, Wallet, Ban as Bank, Bell, Eye, EyeOff, ChevronRight, Briefcase } from 'lucide-react-native'; // Added Briefcase
+import { QrCode, CreditCard, Wallet, Ban as Bank, Bell, Eye, EyeOff, ChevronRight, Briefcase } from 'lucide-react-native';
 import { useAuth } from '@/context/authContext';
-import { gql, useQuery } from '@apollo/client'; // For fetching data
+import { gql, useQuery } from '@apollo/client';
 
-// Define types for fetched data
-interface TransactionSummary {
-  id: string; // Changed from number to string to match Prisma CUID
-  merchantName: string; // Example: 'Starbucks', 'Amazon', or Payer/Payee Name
-  amount: number; // Store as number
-  transactionType: 'CREDIT' | 'DEBIT'; // Or use your backend enum values
+// Define types for fetched data from GraphQL
+// This should align with what your GraphQL query returns for each transaction.
+interface GqlTransaction {
+  id: string;
+  amount: string; // Comes as string from GraphQL Decimal scalar
+  flow: 'CREDIT' | 'DEBIT'; // The new field indicating direction
+  transactionType: 'UPI' | 'CARD' | 'NET_BANKING'; // The payment method
   timestamp: string; // ISO Date string
   category?: string | null;
-  // Add a field for logo/icon if you plan to fetch it or map it
-  logo?: string; // e.g., based on category or merchant
+  notes?: string | null;
+  // Optional: If you derive merchantName on backend and include it directly:
+  merchantName?: string | null;
+  // Optional: If you still derive merchantName on frontend:
+  upiDetails?: { payeeName?: string | null } | null;
+  cardDetails?: { payeeMerchantName?: string | null } | null;
+  netBankingDetails?: { payeeName?: string | null } | null;
 }
 
-interface DashboardData {
-  totalBalance: number; // Or string if your backend sends Decimal as string
-  recentTransactions: TransactionSummary[];
-  // Add other dashboard specific data like unreadNotifications if fetched from backend
+// Define the structure for your local state transactions list
+interface TransactionSummary {
+  id: string;
+  merchantName: string;
+  amount: number; // Parsed amount
+  displayFlow: 'CREDIT' | 'DEBIT'; // This will be used for styling and sign
+  paymentMethod: 'UPI' | 'CARD' | 'NET_BANKING'; // For display if needed
+  timestamp: string;
+  category?: string | null;
+  logo?: string;
 }
 
-// Example GraphQL Query (You'll need to create this on your backend)
+// GraphQL Query: Updated to fetch 'flow' and keep 'transactionType' for payment method
 const GET_DASHBOARD_DATA_QUERY = gql`
   query GetDashboardData {
-    # Query for total balance (you'd need a resolver for this)
-    # Example: myTotalBalance 
-    # For now, we'll keep balance local or assume it's part of 'me' query
-
-    # Query for recent transactions (modify your existing 'transactions' query if needed)
-    transactions(limit: 3, offset: 0) { # Using existing query, adjust limit
+    transactions(limit: 5, offset: 0) { # Adjust limit as needed, e.g., 5
       id
-      amount # This is Decimal, will be string or number based on scalar
-      transactionType
+      amount # This is Decimal (string), always positive magnitude from backend
+      flow # NEW: Will be DEBIT or CREDIT (from TransactionFlow enum)
+      transactionType # The payment method (UPI, CARD, NET_BANKING from TransactionType enum)
       timestamp
       category
-      notes # Can be used for merchant/description if no dedicated field
-      # To get merchant name, we need to look into details
+      notes
+      # To get merchant name, if not derived on backend
       upiDetails { payeeName }
       cardDetails { payeeMerchantName }
       netBankingDetails { payeeName }
+      # If merchantName is derived on backend and added to GQL Transaction type:
+      # merchantName
     }
-    # me { unreadNotificationCount } # If you add this to 'me' query
+    # me { totalBalance, unreadNotificationCount } # Example if fetching these
   }
 `;
 
 
 const paymentMethods = [
   { id: 'upi', name: 'UPI', icon: QrCode, route: '/upi-payment' },
-  { id: 'card', name: 'Card', icon: CreditCard, route: '/payment-methods' }, // Route to manage cards
+  { id: 'card', name: 'Card', icon: CreditCard, route: '/payment-methods' },
   { id: 'wallet', name: 'Wallet', icon: Wallet, route: '/profile/wallet' },
-  { id: 'bank', name: 'Bank', icon: Bank, route: '/payment-methods' }, // Route to manage bank accounts
+  { id: 'bank', name: 'Bank', icon: Bank, route: '/payment-methods' },
 ];
 
 export default function HomePage() {
   const { user, isLoading: authLoading } = useAuth();
   const [showBalance, setShowBalance] = useState(true);
 
-  // Apollo Query for dashboard data
   const { data: dashboardGqlData, loading: dashboardLoading, error: dashboardError, refetch: refetchDashboardData } =
-    useQuery(GET_DASHBOARD_DATA_QUERY, {
-      skip: !user, // Don't run query if user is not logged in
-      fetchPolicy: 'cache-and-network', // Get from cache first, then network
+    useQuery<{ transactions: GqlTransaction[] }>(GET_DASHBOARD_DATA_QUERY, { // Typed useQuery
+      skip: !user,
+      fetchPolicy: 'cache-and-network',
+      onError: (err) => {
+        console.error("GraphQL Error fetching dashboard data:", JSON.stringify(err, null, 2));
+      }
     });
 
-  // Mock data to be replaced by GQL data
-  const [balance, setBalance] = useState(12345.67); // Will be replaced or calculated
+  const [balance, setBalance] = useState(12345.67);
   const [transactions, setTransactions] = useState<TransactionSummary[]>([]);
-  const [unreadNotifications, setUnreadNotifications] = useState(3); // TODO: Fetch this
+  const [unreadNotifications, setUnreadNotifications] = useState(3);
 
 
-  // Process fetched transactions
   useEffect(() => {
     if (dashboardGqlData?.transactions) {
-      const processedTransactions = dashboardGqlData.transactions.map((tx: any) => {
+      const processedTransactions = dashboardGqlData.transactions.map((tx: GqlTransaction) => {
         let merchantName = tx.notes || 'Unknown Transaction'; // Fallback
-        if (tx.upiDetails?.payeeName) merchantName = tx.upiDetails.payeeName;
-        else if (tx.cardDetails?.payeeMerchantName) merchantName = tx.cardDetails.payeeMerchantName;
-        else if (tx.netBankingDetails?.payeeName) merchantName = tx.netBankingDetails.payeeName;
+        // Prefer backend-derived merchantName if available
+        if (tx.merchantName) {
+            merchantName = tx.merchantName;
+        } else { // Fallback to frontend derivation if necessary
+            if (tx.upiDetails?.payeeName) merchantName = tx.upiDetails.payeeName;
+            else if (tx.cardDetails?.payeeMerchantName) merchantName = tx.cardDetails.payeeMerchantName;
+            else if (tx.netBankingDetails?.payeeName) merchantName = tx.netBankingDetails.payeeName;
+        }
 
-        // Determine if it's credit or debit based on your logic (e.g. positive/negative amount or a type field)
-        // Assuming amount is positive for credit, negative for debit if not explicitly typed
-        const amountValue = parseFloat(tx.amount); // tx.amount is Prisma.Decimal, will be string or number
+        // Amount from GraphQL is a string (Decimal scalar), parse it.
+        // Backend sends positive magnitude, 'flow' determines sign.
+        const amountValue = parseFloat(tx.amount);
 
         return {
           id: tx.id,
           merchantName: merchantName,
-          amount: amountValue,
-          // Assuming transactionType is 'CREDIT' or 'DEBIT' or similar from your backend
-          // For this example, inferring from amount value if not present
-          transactionType: amountValue >= 0 ? 'CREDIT' : 'DEBIT',
+          amount: amountValue, // Store the positive magnitude
+          displayFlow: tx.flow, // Use the 'flow' field directly from backend
+          paymentMethod: tx.transactionType, // Use 'transactionType' for payment method
           timestamp: tx.timestamp,
           category: tx.category,
-          logo: getLogoForMerchant(merchantName, tx.category), // Implement this helper
+          logo: getLogoForMerchant(merchantName, tx.category),
         };
       });
       setTransactions(processedTransactions);
     }
-    // TODO: Set actual balance from backend (e.g., a dedicated query or part of 'me')
-    // if (dashboardGqlData?.myTotalBalance) setBalance(parseFloat(dashboardGqlData.myTotalBalance));
+    // if (dashboardGqlData?.me?.totalBalance) setBalance(parseFloat(dashboardGqlData.me.totalBalance));
+    // if (dashboardGqlData?.me?.unreadNotificationCount !== undefined) setUnreadNotifications(dashboardGqlData.me.unreadNotificationCount);
   }, [dashboardGqlData]);
 
 
   const getLogoForMerchant = (merchantName: string, category?: string | null): string => {
-    // Simple logic, expand as needed
-    if (merchantName?.toLowerCase().includes('starbucks') || category?.toLowerCase().includes('food')) return 'https://images.unsplash.com/photo-1610632380989-680fe40816c6?w=64&h=64&fit=crop';
-    if (merchantName?.toLowerCase().includes('amazon') || category?.toLowerCase().includes('shopping')) return 'https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=64&h=64&fit=crop';
-    if (category?.toLowerCase().includes('salary') || category?.toLowerCase().includes('income')) return 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=64&h=64&fit=crop';
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(merchantName?.[0] || 'T')}&background=3a3a3a&color=fff&size=64`; // Default
+    const merchantLower = merchantName?.toLowerCase() || '';
+    const categoryLower = category?.toLowerCase() || '';
+
+    if (merchantLower.includes('starbucks') || categoryLower.includes('food')) return 'https://images.unsplash.com/photo-1610632380989-680fe40816c6?w=64&h=64&fit=crop';
+    if (merchantLower.includes('amazon') || categoryLower.includes('shopping')) return 'https://images.unsplash.com/photo-1523474253046-8cd2748b5fd2?w=64&h=64&fit=crop';
+    if (categoryLower.includes('salary') || categoryLower.includes('income')) return 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=64&h=64&fit=crop';
+    if (merchantLower.includes('ola') || categoryLower.includes('transport')) return 'https://images.unsplash.com/photo-1579559750919-a657a1741695?w=64&h=64&fit=crop'; // Example for Ola
+    if (merchantLower.includes('burgerking') || categoryLower.includes('food')) return 'https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=64&h=64&fit=crop'; // Example for Burger King
+
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(merchantName?.[0] || 'T')}&background=3a3a3a&color=fff&size=64&font-size=0.5`;
   };
 
 
   const handleScanPay = () => router.push('/(tabs)/scan');
-  const handleViewAllTransactions = () => router.push('/transactions'); // Navigate to full transactions list
-  const handlePaymentMethodPress = (route?: string) => { if (route) router.push(route); };
+  const handleViewAllTransactions = () => router.push('/transactions');
+  const handlePaymentMethodPress = (route?: string) => { if (route) router.push(route as any); };
 
   const onRefresh = async () => {
-    if (user) { // Only refetch if user is logged in
+    if (user) {
       try {
         await refetchDashboardData();
       } catch (e) {
@@ -138,8 +157,8 @@ export default function HomePage() {
   }
 
   const displayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Guest';
-  // Use a placeholder avatar if `user.avatarUrl` is not available (same as profile page)
-  const avatarUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName.split(' ')[0]?.[0] || 'P')}&background=2a2a2a&color=fff&size=64`;
+  const avatarInitial = (user?.firstName?.[0] || user?.lastName?.[0] || 'G').toUpperCase();
+  const avatarUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(avatarInitial)}&background=2a2a2a&color=fff&size=64&font-size=0.5`;
 
 
   return (
@@ -148,10 +167,10 @@ export default function HomePage() {
       contentContainerStyle={styles.scrollContent}
       refreshControl={
         <RefreshControl
-          refreshing={dashboardLoading && !!user} // Show refreshing if loading and user exists
+          refreshing={dashboardLoading && !!user}
           onRefresh={onRefresh}
-          tintColor="#8e44ad" // For iOS
-          colors={['#8e44ad']} // For Android
+          tintColor="#8e44ad"
+          colors={['#8e44ad']}
         />
       }
     >
@@ -176,7 +195,6 @@ export default function HomePage() {
         </View>
       </View>
 
-      {/* Balance Card */}
       <View style={styles.balanceCard}>
         <View style={styles.balanceHeader}>
           <Text style={styles.balanceLabel}>Total Balance</Text>
@@ -184,7 +202,6 @@ export default function HomePage() {
             {showBalance ? <Eye color="#fff" size={24} /> : <EyeOff color="#fff" size={24} />}
           </TouchableOpacity>
         </View>
-        {/* TODO: Fetch actual balance */}
         <Text style={styles.balanceAmount}>
           {showBalance ? `₹${balance.toFixed(2)}` : '••••••'}
         </Text>
@@ -194,7 +211,6 @@ export default function HomePage() {
         </TouchableOpacity>
       </View>
 
-      {/* Payment Methods Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.methodsScroll}>
@@ -211,7 +227,6 @@ export default function HomePage() {
         </ScrollView>
       </View>
 
-      {/* Recent Transactions Section */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
@@ -229,17 +244,21 @@ export default function HomePage() {
             style={styles.transactionItem}
             onPress={() => router.push({ pathname: '/transaction-details', params: { id: transaction.id } })}
           >
-            <Image source={{ uri: transaction.logo }} style={styles.merchantLogo} />
+            <View style={styles.logoContainer}>
+                <Image source={{ uri: transaction.logo }} style={styles.merchantLogo} />
+            </View>
             <View style={styles.transactionInfo}>
               <Text style={styles.merchantName} numberOfLines={1}>{transaction.merchantName}</Text>
-              <Text style={styles.transactionDate}>{new Date(transaction.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+              <Text style={styles.transactionDate}>
+                {new Date(transaction.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, {transaction.paymentMethod} {/* Display payment method */}
+              </Text>
             </View>
             <View style={styles.amountContainer}>
               <Text style={[
                 styles.transactionAmount,
-                transaction.transactionType === 'CREDIT' ? styles.positiveAmount : styles.negativeAmount,
+                transaction.displayFlow === 'CREDIT' ? styles.positiveAmount : styles.negativeAmount,
               ]}>
-                {transaction.transactionType === 'CREDIT' ? '+ ' : '- '}₹{Math.abs(transaction.amount).toFixed(2)}
+                {transaction.displayFlow === 'CREDIT' ? '+ ' : '- '}₹{transaction.amount.toFixed(2)} {/* Amount is already positive magnitude */}
               </Text>
               <ChevronRight color="#666" size={16} />
             </View>
@@ -256,7 +275,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
   },
   scrollContent: {
-    paddingBottom: 20, // For scrollable content
+    paddingBottom: 20,
   },
   centered: {
     flex: 1,
@@ -269,7 +288,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 40 : 60, // Adjust for status bar
+    paddingTop: Platform.OS === 'android' ? 40 : 60,
     paddingBottom: 10,
   },
   headerRight: {
@@ -291,6 +310,7 @@ const styles = StyleSheet.create({
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 5, // Added padding for text
   },
   badgeText: {
     color: '#fff',
@@ -309,7 +329,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   avatar: {
-    width: 40, // Slightly smaller avatar in header
+    width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: '#333',
@@ -320,6 +340,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     padding: 20,
     borderRadius: 20,
+    elevation: 5, // Android shadow
+    shadowColor: '#000', // iOS shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   balanceHeader: {
     flexDirection: 'row',
@@ -348,7 +373,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 12,
-    marginTop: 10, // Reduced margin
+    marginTop: 10,
   },
   scanButtonText: {
     color: '#fff',
@@ -358,7 +383,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 20,
-    marginTop: 30, // Increased spacing between sections
+    marginTop: 30,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -377,7 +402,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
   },
   methodsScroll: {
-    marginHorizontal: -5, // Slight adjustment for card spacing
+    marginHorizontal: -5,
   },
   methodCard: {
     backgroundColor: '#2a2a2a',
@@ -385,8 +410,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     marginRight: 12,
-    width: 100, // Fixed width for method cards
-    minHeight: 90, // Ensure consistent height
+    width: 100,
+    minHeight: 90,
     justifyContent: 'center',
   },
   methodName: {
@@ -396,7 +421,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  transactionItem: { // Renamed from 'transaction' for clarity
+  transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#2a2a2a',
@@ -404,11 +429,19 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 12,
   },
-  merchantLogo: {
+  logoContainer: { // Added container for consistent logo size/bg
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#3a3a3a', // Fallback bg for logo
+    backgroundColor: '#3a3a3a', // Fallback if image fails or for initials
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden', // Clip image to rounded border
+  },
+  merchantLogo: {
+    width: '100%', // Make image fill container
+    height: '100%',
+    // borderRadius: 24, // Already on container
   },
   transactionInfo: {
     flex: 1,
@@ -422,14 +455,14 @@ const styles = StyleSheet.create({
   },
   transactionDate: {
     color: '#999',
-    fontSize: 13, // Slightly smaller
+    fontSize: 13,
     fontFamily: 'Inter-Regular',
     marginTop: 4,
   },
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4, // Reduced gap
+    gap: 4,
   },
   transactionAmount: {
     fontSize: 16,

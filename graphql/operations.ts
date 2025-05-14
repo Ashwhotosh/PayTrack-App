@@ -67,15 +67,16 @@ export const UPDATE_TRANSACTION_CATEGORY_MUTATION = gql`
       amount
       notes
       timestamp
-      # Also select detail IDs if the mutation might affect cache for these details
+      transactionType # Payment method
+      flow # <<< ADDED (CREDIT/DEBIT flow)
       upiDetails {
-        id # <<< ADDED
+        id
       }
       cardDetails {
-        id # <<< ADDED
+        id
       }
       netBankingDetails {
-        id # <<< ADDED
+        id
       }
     }
   }
@@ -86,24 +87,24 @@ export const CREATE_TRANSACTION_MUTATION = gql`
     createTransaction(input: $input) {
       id
       amount
-      transactionType
+      transactionType # Payment method
+      flow # <<< ADDED (CREDIT/DEBIT flow)
       notes
       timestamp
       upiDetails {
-        id # <<< ADDED
+        id
         payeeUpiId
-        # You might also want payeeName here if needed immediately
-        # payeeName
+        payeeName
       }
       cardDetails {
-        id # <<< ADDED
-        # payeeMerchantName
+        id
+        payeeMerchantName
       }
       netBankingDetails {
-        id # <<< ADDED
-        # payeeName
-        # payeeBankName
-        # referenceId
+        id
+        payeeName
+        payeeBankName
+        referenceId
       }
     }
   }
@@ -128,9 +129,11 @@ export const GET_MY_UPI_ACCOUNTS_QUERY = gql`
     }
   }
 `;
+// You would add similar queries for GET_MY_CARD_ACCOUNTS_QUERY and GET_MY_BANK_ACCOUNTS_QUERY if needed
 
 
 // === ANALYTICS QUERIES ===
+
 export const GET_ANALYTICS_TRANSACTIONS_QUERY = gql`
   query GetAnalyticsTransactions(
     $limit: Int
@@ -142,6 +145,7 @@ export const GET_ANALYTICS_TRANSACTIONS_QUERY = gql`
       id
       amount
       transactionType
+      flow # <<< ADDED (CREDIT/DEBIT flow)
       timestamp
       category
       notes
@@ -160,6 +164,47 @@ export const GET_ANALYTICS_TRANSACTIONS_QUERY = gql`
         # payeeBankName
         # referenceId
       }
+    }
+  }
+`;
+
+// This is your main transactions query, used also on the dashboard
+export const GET_DASHBOARD_TRANSACTIONS_QUERY = gql`
+  query GetDashboardTransactions( # Renamed for clarity, or keep as GetAnalyticsTransactions if preferred
+    $limit: Int
+    $offset: Int
+    $dateFrom: DateTime
+    $dateTo: DateTime
+    # $filterType: TransactionType # If you had specific filter for payment method
+  ) {
+    transactions(
+      limit: $limit,
+      offset: $offset,
+      dateFrom: $dateFrom,
+      dateTo: $dateTo
+      # filterType: $filterType
+    ) {
+      id
+      amount
+      transactionType # Payment method
+      flow # <<< ADDED (CREDIT/DEBIT flow)
+      timestamp
+      category
+      notes
+      upiDetails {
+        id
+        payeeName
+      }
+      cardDetails {
+        id
+        payeeMerchantName
+      }
+      netBankingDetails {
+        id
+        payeeName
+      }
+      # If you derive merchantName on backend, include it:
+      # merchantName
     }
   }
 `;
@@ -183,23 +228,22 @@ export const GET_TRANSACTION_DETAILS_QUERY = gql`
     transaction(id: $id) {
       id
       amount # Decimal
-      transactionType
+      transactionType # Payment method
+      flow # <<< ADDED (CREDIT/DEBIT flow)
       timestamp # DateTime
       notes
       category
       createdAt # DateTime
-      # Payer information (optional, but useful for context)
-      # payer {
+      # payer { # Uncomment if you want to show payer details
       #   id
       #   firstName
       #   lastName
       # }
-      # Specific details based on type
       upiDetails {
         id
         payeeName
         payeeUpiId
-        payerUpiAccount { # For displaying "Paid from Account X"
+        payerUpiAccount {
           id
           displayName
           upiId
@@ -208,7 +252,7 @@ export const GET_TRANSACTION_DETAILS_QUERY = gql`
       cardDetails {
         id
         payeeMerchantName
-        payerCardAccount { # For displaying "Paid from Card ending in XXXX"
+        payerCardAccount {
           id
           cardLast4Digits
           cardType
@@ -219,7 +263,7 @@ export const GET_TRANSACTION_DETAILS_QUERY = gql`
         payeeName
         payeeBankName
         referenceId
-        payerBankAccount { # For displaying "Paid from Bank Account YYYY"
+        payerBankAccount {
           id
           bankName
           accountNumberLast4
@@ -228,7 +272,6 @@ export const GET_TRANSACTION_DETAILS_QUERY = gql`
     }
   }
 `;
-
 // === END TRANSACTION DETAILS QUERY ===
 
 // Add other queries/mutations as needed

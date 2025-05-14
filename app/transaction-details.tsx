@@ -1,17 +1,20 @@
 // app/transaction-details.tsx
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Platform, Modal, Alert, Pressable } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, Receipt, Share2, Flag } from 'lucide-react-native'; // Removed Download for now
+import { ArrowLeft, Receipt, Share2, Flag, ChevronDown } from 'lucide-react-native';
 import { format, parseISO } from 'date-fns';
+import { useState, useEffect } from 'react';
 
-// Import generated hook and types
+// Import generated hooks and types
 import {
   useGetTransactionDetailsQuery,
-  Transaction as GqlTransaction, // Renaming for clarity if needed
+  useGetAvailableCategoriesQuery, // For fetching categories
+  useUpdateTransactionCategoryMutation, // For updating the category
   TransactionType as GqlTransactionType,
-} from '@/graphql/generated/graphql';
+  TransactionFlow, // Import the TransactionFlow enum if you're using it directly for styling
+} from '@/graphql/generated/graphql'; // Ensure this path is correct
 
-// Helper to get a placeholder icon URL (can be moved to a utils file)
+// Helper to get a placeholder icon URL
 const getPlaceholderIcon = (name?: string | null) => {
     const initial = name ? name[0].toUpperCase() : 'T';
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(initial)}&background=3a3a3a&color=fff&size=128&font-size=0.5`;
@@ -19,17 +22,85 @@ const getPlaceholderIcon = (name?: string | null) => {
 
 
 export default function TransactionDetailsPage() {
-  const { id } = useLocalSearchParams<{ id: string }>(); // Type the id param
+  const { id } = useLocalSearchParams<{ id: string }>();
 
-  const { data, loading, error } = useGetTransactionDetailsQuery({
-    variables: { id: id || '' }, // Ensure id is a string, provide fallback if id can be undefined initially
-    skip: !id, // Skip query if id is not available
+  // --- State for Category Editing ---
+  const [selectedCategory, setSelectedCategory] = useState<string | null | undefined>(null);
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+
+  // --- GraphQL Hooks ---
+  const { data: transactionData, loading: transactionLoading, error: transactionError, refetch: refetchTransactionDetails } = useGetTransactionDetailsQuery({
+    variables: { id: id || '' },
+    skip: !id,
     fetchPolicy: 'cache-and-network',
+    onCompleted: (data) => { // Pre-fill selectedCategory when transaction data loads
+      if (data?.transaction?.category) {
+        setSelectedCategory(data.transaction.category);
+      } else if (data?.transaction) {
+        setSelectedCategory(null); // Explicitly set to null if not categorized
+      }
+    }
   });
 
-  const transaction = data?.transaction;
+  const { data: categoriesData, loading: categoriesLoading, error: categoriesError } =
+    useGetAvailableCategoriesQuery();
 
-  if (loading) {
+  const [updateCategoryMutation, { loading: updateCategoryLoading, error: updateCategoryError }] =
+    useUpdateTransactionCategoryMutation();
+
+  const transaction = transactionData?.transaction;
+
+  // --- Effect to update selectedCategory if transaction changes ---
+  useEffect(() => {
+    if (transaction?.category) {
+      setSelectedCategory(transaction.category);
+    } else if (transaction) { // If transaction exists but has no category
+      setSelectedCategory(null);
+    }
+  }, [transaction?.category, transaction?.id]); // Depend on transaction.id too, to reset if transaction changes
+
+
+  // --- Event Handlers ---
+  const handleCategorySelect = async (category: string) => {
+    if (!id) return;
+    setShowCategoriesModal(false); // Close modal first
+
+    // Optimistic update for UI
+    const previousCategory = selectedCategory;
+    setSelectedCategory(category);
+
+    try {
+      const { data: updateData, errors: gqlErrors } = await updateCategoryMutation({
+        variables: { transactionId: id, category: category },
+        // Optional: Refetch transaction details after update or update cache
+        // refetchQueries: [{ query: GET_TRANSACTION_DETAILS_QUERY, variables: { id } }],
+      });
+
+      if (gqlErrors && gqlErrors.length > 0) {
+        console.error("GraphQL errors updating category:", JSON.stringify(gqlErrors, null, 2));
+        Alert.alert("Error Updating Category", gqlErrors.map(e => e.message).join('\n'));
+        setSelectedCategory(previousCategory); // Revert optimistic update
+      } else if (updateData?.updateTransactionCategory) {
+        console.log(`Category for tx ${id} successfully updated to: ${updateData.updateTransactionCategory.category}`);
+        // The selectedCategory is already set. If you refetch, it will update naturally.
+        // If not refetching, ensure the local state is definitely what was saved:
+        setSelectedCategory(updateData.updateTransactionCategory.category);
+        // Optionally refetch to ensure all data is fresh
+        if(refetchTransactionDetails) refetchTransactionDetails();
+
+      } else {
+        console.warn("Category update mutation returned no data and no GraphQL errors.");
+        setSelectedCategory(previousCategory); // Revert
+      }
+    } catch (e: any) {
+      console.error("Network/Exception Failed to update category:", JSON.stringify(e, null, 2));
+      Alert.alert("Error Updating Category", e.message || "Could not update category.");
+      setSelectedCategory(previousCategory); // Revert
+    }
+  };
+
+
+  if (transactionLoading && !transactionData) { // Show loading only on initial fetch
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#8e44ad" />
@@ -38,12 +109,12 @@ export default function TransactionDetailsPage() {
     );
   }
 
-  if (error) {
+  if (transactionError) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text style={styles.errorText}>Error loading transaction: {error.message}</Text>
-        <TouchableOpacity style={styles.actionButton} onPress={() => router.back()}>
-            <Text style={styles.actionText}>Go Back</Text>
+        <Text style={styles.errorText}>Error loading transaction: {transactionError.message}</Text>
+        <TouchableOpacity style={styles.genericActionButton} onPress={() => router.back()}>
+            <Text style={styles.genericActionText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -53,8 +124,8 @@ export default function TransactionDetailsPage() {
     return (
       <View style={[styles.container, styles.centered]}>
         <Text style={styles.errorText}>Transaction not found.</Text>
-         <TouchableOpacity style={styles.actionButton} onPress={() => router.back()}>
-            <Text style={styles.actionText}>Go Back</Text>
+         <TouchableOpacity style={styles.genericActionButton} onPress={() => router.back()}>
+            <Text style={styles.genericActionText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -62,7 +133,7 @@ export default function TransactionDetailsPage() {
 
   // --- Process data for display ---
   let merchantNameOrPayee = transaction.notes || 'N/A';
-  let paymentMethodDisplay = transaction.transactionType.toString(); // Fallback
+  let paymentMethodDisplay = transaction.transactionType.toString(); // Use paymentMethod from GQL
   let iconUrl = getPlaceholderIcon(merchantNameOrPayee);
   let referenceDisplay = 'N/A';
 
@@ -70,7 +141,7 @@ export default function TransactionDetailsPage() {
     merchantNameOrPayee = transaction.upiDetails.payeeName;
     iconUrl = getPlaceholderIcon(merchantNameOrPayee);
     paymentMethodDisplay = `UPI from ${transaction.upiDetails.payerUpiAccount?.displayName || transaction.upiDetails.payerUpiAccount?.upiId || 'UPI Account'}`;
-    referenceDisplay = transaction.upiDetails.payeeUpiId; // Or a specific ref if available
+    referenceDisplay = transaction.upiDetails.payeeUpiId;
   } else if (transaction.transactionType === GqlTransactionType.Card && transaction.cardDetails) {
     merchantNameOrPayee = transaction.cardDetails.payeeMerchantName;
     iconUrl = getPlaceholderIcon(merchantNameOrPayee);
@@ -82,38 +153,26 @@ export default function TransactionDetailsPage() {
     referenceDisplay = transaction.netBankingDetails.referenceId;
   }
 
-  const amountValue = typeof transaction.amount === 'string' ? parseFloat(transaction.amount) : typeof transaction.amount === 'number' ? transaction.amount : 0;
+  const amountValue = typeof transaction.amount === 'string' ? parseFloat(transaction.amount) : 0;
   
-  // Determine transaction nature (credit/debit) - this logic needs to be robust
-  // For now, assume positive means credit (e.g. salary) and other types are debits,
-  // or rely on category. This should ideally come from backend or a clear amount sign.
-  let isCredit = false;
-  if (transaction.category?.toLowerCase() === 'salary' || transaction.category?.toLowerCase() === 'income') {
-      isCredit = true;
-  } else if (amountValue > 0 && (transaction.transactionType !== GqlTransactionType.Upi && transaction.transactionType !== GqlTransactionType.Card && transaction.transactionType !== GqlTransactionType.NetBanking /* add other expense types */) ) {
-      // Heuristic: if amount is positive AND not a typical expense type, assume credit.
-      // This is weak. Best to have a clear indicator from backend.
-      // For now, let's assume all non-categorized as income are debits if amount is positive.
-      // So if amount is positive for a payment, we'll show it as debit with Math.abs()
-  }
-  // If your `amount` from backend is signed (negative for debit), then:
-  // const isCredit = amountValue >= 0;
-  // const displayAmount = Math.abs(amountValue);
+  // Use the 'flow' field from GraphQL
+  const isCredit = transaction.flow === TransactionFlow.Credit; // Or 'CREDIT' string if not using enum type directly
 
-  const displayAmount = Math.abs(amountValue);
+  const displayAmount = amountValue; // Amount from backend is already positive magnitude
   const amountStyle = isCredit ? styles.positiveAmount : styles.negativeAmount;
   const amountPrefix = isCredit ? '+₹' : '-₹';
-  const status = "Completed"; // Assuming all fetched transactions are completed for now
+  const status = "Completed";
+
+  const availableCategories = categoriesData?.availableTransactionCategories || [];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{paddingBottom: 20}}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} disabled={updateCategoryLoading}>
           <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
         <Text style={styles.title}>Transaction Details</Text>
-        <TouchableOpacity>
-          {/* TODO: Implement Share functionality */}
+        <TouchableOpacity disabled={updateCategoryLoading}>
           <Share2 color="#fff" size={24} />
         </TouchableOpacity>
       </View>
@@ -134,10 +193,28 @@ export default function TransactionDetailsPage() {
             {format(parseISO(transaction.timestamp as string), 'dd MMM yyyy, hh:mm a')}
           </Text>
         </View>
-        <View style={styles.detailRow}>
+        {/* Category Row - Clickable */}
+        <TouchableOpacity
+          style={styles.detailRow}
+          onPress={() => setShowCategoriesModal(true)}
+          disabled={categoriesLoading || updateCategoryLoading || availableCategories.length === 0}
+        >
           <Text style={styles.detailLabel}>Category</Text>
-          <Text style={styles.detailValue}>{transaction.category || 'Not Categorized'}</Text>
-        </View>
+          <View style={styles.categoryValueContainer}>
+            <Text style={[
+                styles.detailValue,
+                selectedCategory === null && styles.notCategorizedText
+            ]}>
+              {updateCategoryLoading ? 'Saving...' : (selectedCategory || 'Not Categorized')}
+            </Text>
+            {!updateCategoryLoading && <ChevronDown color="#8e44ad" size={16} style={{ marginLeft: 5 }}/>}
+            {updateCategoryLoading && <ActivityIndicator size="small" color="#8e44ad" style={{ marginLeft: 5 }} />}
+          </View>
+        </TouchableOpacity>
+        {categoriesError && <Text style={styles.inlineErrorText}>Error: {categoriesError.message}</Text>}
+        {updateCategoryError && <Text style={styles.inlineErrorText}>Error: {updateCategoryError.message}</Text>}
+
+
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Payment Method</Text>
           <Text style={styles.detailValue}>{paymentMethodDisplay}</Text>
@@ -159,15 +236,77 @@ export default function TransactionDetailsPage() {
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity style={styles.actionButton} disabled={updateCategoryLoading}>
           <Receipt color="#8e44ad" size={24} />
           <Text style={styles.actionText}>Download Receipt</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.reportButton]}>
+        <TouchableOpacity style={[styles.actionButton, styles.reportButton]} disabled={updateCategoryLoading}>
           <Flag color="#FF5252" size={24} />
           <Text style={[styles.actionText, styles.reportText]}>Report Issue</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Categories Modal */}
+      {/* Categories Modal */}
+{showCategoriesModal && (
+  <Modal
+    visible
+    transparent
+    animationType="slide"
+    onRequestClose={() => setShowCategoriesModal(false)}
+  >
+    {/* 
+      The outer Pressable is our backdrop.
+      Tapping it will close the modal.
+    */}
+    <Pressable
+      style={styles.modalOverlay}
+      onPress={() => setShowCategoriesModal(false)}
+    >
+      {/* 
+        The inner Pressable is our content container.
+        We call stopPropagation so taps here do NOT bubble up.
+      */}
+      <Pressable
+        style={styles.modalContent}
+        onPress={(e: any) => e.stopPropagation()}
+      >
+        <Text style={styles.modalTitle}>Select Category</Text>
+        {categoriesLoading && (
+          <ActivityIndicator color="#8e44ad" style={{ marginBottom: 10 }} />
+        )}
+        <ScrollView>
+          {availableCategories.map((categoryName) => (
+            <TouchableOpacity
+              key={categoryName}
+              style={[
+                styles.modalOption,
+                selectedCategory === categoryName && styles.modalOptionSelected,
+              ]}
+              onPress={() => handleCategorySelect(categoryName)}
+              disabled={updateCategoryLoading}
+            >
+              <Text
+                style={[
+                  styles.modalOptionText,
+                  selectedCategory === categoryName && styles.modalOptionTextSelected,
+                ]}
+              >
+                {categoryName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          {availableCategories.length === 0 && !categoriesLoading && (
+            <Text style={styles.modalOptionText}>
+              No categories available.
+            </Text>
+          )}
+        </ScrollView>
+      </Pressable>
+    </Pressable>
+  </Modal>
+)}
+
     </ScrollView>
   );
 }
@@ -194,6 +333,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter-Regular',
     fontSize: 16,
+    marginBottom: 15,
+  },
+  inlineErrorText: {
+    color: '#FF5252',
+    textAlign: 'center',
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    paddingVertical: 5,
   },
   header: {
     flexDirection: 'row',
@@ -220,17 +367,17 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     marginBottom: 16,
-    backgroundColor: '#3a3a3a', // Fallback
+    backgroundColor: '#3a3a3a',
   },
   amount: {
     fontSize: 36,
     fontFamily: 'Inter-Bold',
     marginBottom: 4,
   },
-  positiveAmount: { // Add this style
+  positiveAmount: {
     color: '#4CAF50',
   },
-  negativeAmount: { // Add this style
+  negativeAmount: {
     color: '#FF5252',
   },
   description: {
@@ -242,7 +389,7 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: 14,
-    color: '#4CAF50', // Assuming 'Completed' status is positive
+    color: '#4CAF50',
     fontFamily: 'Inter-SemiBold',
     backgroundColor: 'rgba(76, 175, 80, 0.15)',
     paddingHorizontal: 12,
@@ -253,35 +400,45 @@ const styles = StyleSheet.create({
   section: {
     backgroundColor: '#2a2a2a',
     marginHorizontal: 20,
-    paddingHorizontal: 20, // Add horizontal padding inside the card
-    paddingVertical: 10,   // Add vertical padding inside the card
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 16,
     marginBottom: 20,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start', // For potentially multiline values
+    alignItems: 'center', // Changed to center for category icon
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#3a3a3a', // Slightly lighter border
+    borderBottomColor: '#3a3a3a',
   },
   detailLabel: {
-    fontSize: 14, // Slightly smaller
+    fontSize: 14,
     color: '#999',
     fontFamily: 'Inter-Regular',
-    marginRight: 10, // Add some space
+    marginRight: 10,
   },
   detailValue: {
-    fontSize: 14, // Slightly smaller
-    color: '#e0e0e0', // Lighter white
+    fontSize: 14,
+    color: '#e0e0e0',
     fontFamily: 'Inter-SemiBold',
-    flexShrink: 1, // Allow value to wrap if long
+    flexShrink: 1,
     textAlign: 'right',
+  },
+  categoryValueContainer: { // For category text and icon
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    justifyContent: 'flex-end',
+  },
+  notCategorizedText: {
+    color: '#888', // Dimmer color for "Not Categorized"
+    fontFamily: 'Inter-Regular',
   },
   actions: {
     paddingHorizontal: 20,
-    paddingBottom: 30, // More space at bottom
+    paddingBottom: 30,
     gap: 12,
   },
   actionButton: {
@@ -291,7 +448,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     paddingVertical: 16,
     borderRadius: 12,
-    gap: 10, // Increased gap
+    gap: 10,
   },
   actionText: {
     fontSize: 16,
@@ -303,5 +460,57 @@ const styles = StyleSheet.create({
   },
   reportText: {
     color: '#FF5252',
+  },
+  genericActionButton: { // For standalone back/retry buttons
+    backgroundColor: '#8e44ad',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  genericActionText: {
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+    textAlign: 'center',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#2a2a2a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20, // SafeArea for bottom
+    maxHeight: '60%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    color: '#fff',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalOption: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3a3a3a',
+  },
+  modalOptionSelected: {
+    backgroundColor: 'rgba(142, 68, 173, 0.2)', // Lighter selection color
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
+  modalOptionTextSelected: {
+    fontFamily: 'Inter-SemiBold',
+    color: '#8e44ad',
   },
 });
