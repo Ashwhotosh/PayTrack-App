@@ -462,14 +462,14 @@ export type UpdateTransactionCategoryMutationVariables = Exact<{
 }>;
 
 
-export type UpdateTransactionCategoryMutation = { __typename?: 'Mutation', updateTransactionCategory: { __typename?: 'Transaction', id: string, category?: string | null, amount: any, notes?: string | null, timestamp: any } };
+export type UpdateTransactionCategoryMutation = { __typename?: 'Mutation', updateTransactionCategory: { __typename?: 'Transaction', id: string, category?: string | null, amount: any, notes?: string | null, timestamp: any, upiDetails?: { __typename?: 'UPITransaction', id: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string } | null } };
 
 export type CreateTransactionMutationVariables = Exact<{
   input: CreateTransactionInput;
 }>;
 
 
-export type CreateTransactionMutation = { __typename?: 'Mutation', createTransaction: { __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, notes?: string | null, timestamp: any, upiDetails?: { __typename?: 'UPITransaction', payeeUpiId: string } | null } };
+export type CreateTransactionMutation = { __typename?: 'Mutation', createTransaction: { __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, notes?: string | null, timestamp: any, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeUpiId: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string } | null } };
 
 export type GetRealtimeCategorySuggestionQueryVariables = Exact<{
   transactionId: Scalars['ID']['input'];
@@ -491,7 +491,7 @@ export type GetAnalyticsTransactionsQueryVariables = Exact<{
 }>;
 
 
-export type GetAnalyticsTransactionsQuery = { __typename?: 'Query', transactions: Array<{ __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, timestamp: any, category?: string | null, notes?: string | null, upiDetails?: { __typename?: 'UPITransaction', payeeName: string } | null, cardDetails?: { __typename?: 'CardTransaction', payeeMerchantName: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', payeeName: string } | null }> };
+export type GetAnalyticsTransactionsQuery = { __typename?: 'Query', transactions: Array<{ __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, timestamp: any, category?: string | null, notes?: string | null, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeName: string, payeeUpiId: string } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string } | null }> };
 
 export type GetCategorySpendingSummaryQueryVariables = Exact<{
   dateFrom?: InputMaybe<Scalars['DateTime']['input']>;
@@ -500,6 +500,13 @@ export type GetCategorySpendingSummaryQueryVariables = Exact<{
 
 
 export type GetCategorySpendingSummaryQuery = { __typename?: 'Query', categorySpendingSummary: Array<{ __typename?: 'CategorySpending', category: string, totalAmount: any }> };
+
+export type GetTransactionDetailsQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type GetTransactionDetailsQuery = { __typename?: 'Query', transaction?: { __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, timestamp: any, notes?: string | null, category?: string | null, createdAt: any, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeName: string, payeeUpiId: string, payerUpiAccount: { __typename?: 'UserUpiAccount', id: string, displayName: string, upiId: string } } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string, payerCardAccount: { __typename?: 'UserCardAccount', id: string, cardLast4Digits: string, cardType: string } } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string, payeeBankName: string, referenceId: string, payerBankAccount: { __typename?: 'UserBankAccount', id: string, bankName: string, accountNumberLast4: string } } | null } | null };
 
 
 export const LoginDocument = gql`
@@ -678,6 +685,15 @@ export const UpdateTransactionCategoryDocument = gql`
     amount
     notes
     timestamp
+    upiDetails {
+      id
+    }
+    cardDetails {
+      id
+    }
+    netBankingDetails {
+      id
+    }
   }
 }
     `;
@@ -717,7 +733,14 @@ export const CreateTransactionDocument = gql`
     notes
     timestamp
     upiDetails {
+      id
       payeeUpiId
+    }
+    cardDetails {
+      id
+    }
+    netBankingDetails {
+      id
     }
   }
 }
@@ -845,12 +868,16 @@ export const GetAnalyticsTransactionsDocument = gql`
     category
     notes
     upiDetails {
+      id
       payeeName
+      payeeUpiId
     }
     cardDetails {
+      id
       payeeMerchantName
     }
     netBankingDetails {
+      id
       payeeName
     }
   }
@@ -934,3 +961,79 @@ export type GetCategorySpendingSummaryQueryHookResult = ReturnType<typeof useGet
 export type GetCategorySpendingSummaryLazyQueryHookResult = ReturnType<typeof useGetCategorySpendingSummaryLazyQuery>;
 export type GetCategorySpendingSummarySuspenseQueryHookResult = ReturnType<typeof useGetCategorySpendingSummarySuspenseQuery>;
 export type GetCategorySpendingSummaryQueryResult = Apollo.QueryResult<GetCategorySpendingSummaryQuery, GetCategorySpendingSummaryQueryVariables>;
+export const GetTransactionDetailsDocument = gql`
+    query GetTransactionDetails($id: ID!) {
+  transaction(id: $id) {
+    id
+    amount
+    transactionType
+    timestamp
+    notes
+    category
+    createdAt
+    upiDetails {
+      id
+      payeeName
+      payeeUpiId
+      payerUpiAccount {
+        id
+        displayName
+        upiId
+      }
+    }
+    cardDetails {
+      id
+      payeeMerchantName
+      payerCardAccount {
+        id
+        cardLast4Digits
+        cardType
+      }
+    }
+    netBankingDetails {
+      id
+      payeeName
+      payeeBankName
+      referenceId
+      payerBankAccount {
+        id
+        bankName
+        accountNumberLast4
+      }
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetTransactionDetailsQuery__
+ *
+ * To run a query within a React component, call `useGetTransactionDetailsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTransactionDetailsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTransactionDetailsQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetTransactionDetailsQuery(baseOptions: ApolloReactHooks.QueryHookOptions<GetTransactionDetailsQuery, GetTransactionDetailsQueryVariables> & ({ variables: GetTransactionDetailsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetTransactionDetailsQuery, GetTransactionDetailsQueryVariables>(GetTransactionDetailsDocument, options);
+      }
+export function useGetTransactionDetailsLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetTransactionDetailsQuery, GetTransactionDetailsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetTransactionDetailsQuery, GetTransactionDetailsQueryVariables>(GetTransactionDetailsDocument, options);
+        }
+export function useGetTransactionDetailsSuspenseQuery(baseOptions?: ApolloReactHooks.SkipToken | ApolloReactHooks.SuspenseQueryHookOptions<GetTransactionDetailsQuery, GetTransactionDetailsQueryVariables>) {
+          const options = baseOptions === ApolloReactHooks.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useSuspenseQuery<GetTransactionDetailsQuery, GetTransactionDetailsQueryVariables>(GetTransactionDetailsDocument, options);
+        }
+export type GetTransactionDetailsQueryHookResult = ReturnType<typeof useGetTransactionDetailsQuery>;
+export type GetTransactionDetailsLazyQueryHookResult = ReturnType<typeof useGetTransactionDetailsLazyQuery>;
+export type GetTransactionDetailsSuspenseQueryHookResult = ReturnType<typeof useGetTransactionDetailsSuspenseQuery>;
+export type GetTransactionDetailsQueryResult = Apollo.QueryResult<GetTransactionDetailsQuery, GetTransactionDetailsQueryVariables>;

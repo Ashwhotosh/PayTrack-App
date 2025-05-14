@@ -83,7 +83,7 @@ export default function UpiPaymentScreen() {
             transactionType: TransactionType.Upi, // This should match your GraphQL enum 'TransactionType.Upi'
                                     // The generated type for transactionType in CreateTransactionInput is 'TransactionType' enum
             payerAccountId: selectedPayerAccountId,
-            notes: note.trim() || null,
+            notes: note.trim() ? note.trim() : undefined, // <<< CORRECTED LINE FOR NOTES
             upiDetails: {
               payeeName: upiId.split('@')[0]?.trim() || upiId.trim(),
               payeeUpiId: upiId.trim(),
@@ -140,7 +140,7 @@ export default function UpiPaymentScreen() {
     return (
       <View style={[styles.container, styles.centered]}>
         <Text style={styles.errorText}>Error loading payment accounts: {upiAccountsError.message}</Text>
-        <TouchableOpacity style={styles.goBackButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/')}>
+        <TouchableOpacity style={styles.goBackButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}>
           <Text style={styles.goBackButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>

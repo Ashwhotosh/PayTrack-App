@@ -1,16 +1,15 @@
 // app/_layout.tsx
 import { useEffect } from 'react';
-import { Slot, SplashScreen, Stack, useRouter, useSegments } from 'expo-router'; // Import useRouter, useSegments
+import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router'; // Removed Slot for now
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { ApolloProvider } from '@apollo/client';
 import client from '@/lib/apolloClient';
-import { AuthProvider, useAuth } from '@/context/authContext'; // Import AuthProvider and useAuth
-import { ActivityIndicator, View } from 'react-native'; // For loading indicator
+import { AuthProvider, useAuth } from '@/context/authContext';
+import { ActivityIndicator, View, StyleSheet } from 'react-native'; // Added StyleSheet
 
 export { ErrorBoundary } from 'expo-router';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -24,16 +23,14 @@ export default function RootLayout() {
     if (fontError) throw fontError;
   }, [fontError]);
 
-  // Hide splash screen once fonts are loaded OR if there's a font error (to show error boundary)
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
-
   if (!fontsLoaded && !fontError) {
-    return null; // Keep splash screen visible
+    return null;
   }
 
   return (
@@ -46,49 +43,88 @@ export default function RootLayout() {
 }
 
 function LayoutController() {
-  const { token, isLoading, isAppLoading } = useAuth();
+  const { token, isLoading, isAppLoading, user } = useAuth(); // Added user for logging
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    if (isAppLoading || isLoading) return; // Still determining auth state or loading initial user
+    const currentRoute = segments.join('/') || 'index (at root)';
+    // console.log(
+    //   `LayoutCtrl useEffect | Token: ${token ? 'YES' : 'NO'} | isLoading: ${isLoading} | isAppLoading: ${isAppLoading} | User: ${user?.email || 'None'} | Segments: ${currentRoute}`
+    // );
+
+    // If we are still in the initial app loading phase (checking async storage, etc.)
+    // or if a login/logout operation is actively in progress, wait.
+    if (isAppLoading || isLoading) {
+      // console.log('LayoutCtrl useEffect: Exit - App/Auth state still loading.');
+      return;
+    }
 
     const inAuthGroup = segments[0] === '(auth)';
+    // console.log(`LayoutCtrl useEffect: In Auth Group? ${inAuthGroup}`);
 
-    if (token && !inAuthGroup) {
-      // User is authenticated but not in an auth screen (e.g., deep link to auth while logged in)
-      // Or, initial load and token found, redirect to tabs
-      router.replace('/(tabs)');
-    } else if (!token && !inAuthGroup) {
-      // User is not authenticated and not in an auth screen, redirect to login
-      router.replace('/(auth)/login');
+    if (token) {
+      // User is authenticated (token exists)
+      if (inAuthGroup) {
+        // Token exists, AND user is currently on an auth screen (e.g., login, signup)
+        // This happens right after a successful login/signup. Redirect to main app.
+        // console.log('LayoutCtrl useEffect: ACTION - Token exists, in auth group. Redirecting to /tabs');
+        router.replace('/(tabs)');
+      } else {
+        // Token exists, and user is already outside auth group (e.g., on /tabs or a protected child route).
+        // No redirect is generally needed from here unless you want to force them to a specific screen like /tabs
+        // if they somehow landed on a non-auth, non-tabs screen while logged in.
+        // For now, this case means they are likely where they should be.
+        // console.log('LayoutCtrl useEffect: Token exists, NOT in auth group. No redirect needed from here.');
+      }
+    } else {
+      // No token (user is not authenticated)
+      if (!inAuthGroup) {
+        // No token, AND user is NOT on an auth screen (e.g., tried to access /tabs directly or a protected route)
+        // Redirect to login.
+        console.log('LayoutCtrl useEffect: ACTION - No token, NOT in auth group. Redirecting to /login');
+        router.replace('/(auth)/login');
+      } else {
+        // No token, AND user is already on an auth screen (e.g., login, signup).
+        // This is the correct state, so no redirect needed.
+        console.log('LayoutCtrl useEffect: No token, IS in auth group. No redirect needed.');
+      }
     }
-  }, [token, segments, isLoading, router, isAppLoading]);
+  }, [token, segments, isLoading, isAppLoading, router, user]); // Added user to dep array for logging clarity
 
-  // Show a global loading indicator while checking auth state or initial user fetch
   if (isAppLoading || isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#8e44ad" />
       </View>
     );
   }
 
+  // If redirection logic is handled, this Stack will render based on current route
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="payment-success" />
         <Stack.Screen name="transaction-details" />
         <Stack.Screen name="upi-payment" />
+        {/* The 'profile' group layout will handle its own screens if defined in app/profile/_layout.tsx */}
+        {/* If profile screens are top-level and not in a group, list them here */}
         <Stack.Screen name="profile" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="light" />
     </>
   );
-  // Alternatively, use <Slot /> if you want expo-router to manage the stack based on auth state more directly
-  // return <Slot />;
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+});

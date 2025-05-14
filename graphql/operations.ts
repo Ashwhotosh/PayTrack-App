@@ -67,6 +67,16 @@ export const UPDATE_TRANSACTION_CATEGORY_MUTATION = gql`
       amount
       notes
       timestamp
+      # Also select detail IDs if the mutation might affect cache for these details
+      upiDetails {
+        id # <<< ADDED
+      }
+      cardDetails {
+        id # <<< ADDED
+      }
+      netBankingDetails {
+        id # <<< ADDED
+      }
     }
   }
 `;
@@ -79,8 +89,21 @@ export const CREATE_TRANSACTION_MUTATION = gql`
       transactionType
       notes
       timestamp
-      upiDetails { # Added as per previous recommendation
+      upiDetails {
+        id # <<< ADDED
         payeeUpiId
+        # You might also want payeeName here if needed immediately
+        # payeeName
+      }
+      cardDetails {
+        id # <<< ADDED
+        # payeeMerchantName
+      }
+      netBankingDetails {
+        id # <<< ADDED
+        # payeeName
+        # payeeBankName
+        # referenceId
       }
     }
   }
@@ -107,32 +130,36 @@ export const GET_MY_UPI_ACCOUNTS_QUERY = gql`
 `;
 
 
-// === ANALYTICS QUERIES (NEW) ===
+// === ANALYTICS QUERIES ===
 export const GET_ANALYTICS_TRANSACTIONS_QUERY = gql`
   query GetAnalyticsTransactions(
     $limit: Int
     $offset: Int
     $dateFrom: DateTime
-    $dateTo: DateTime # Add other filters specific to analytics if needed
+    $dateTo: DateTime
   ) {
     transactions(limit: $limit, offset: $offset, dateFrom: $dateFrom, dateTo: $dateTo) {
       id
-      amount # This is Decimal, will be string or number based on scalar mapping
+      amount
       transactionType
       timestamp
       category
-      notes # Can be used for merchant/description if no dedicated field
-      # To get merchant name, we need to look into details
+      notes
       upiDetails {
+        id # <<< ADDED
         payeeName
+        payeeUpiId # If needed for display
       }
       cardDetails {
+        id # <<< ADDED
         payeeMerchantName
       }
       netBankingDetails {
+        id # <<< ADDED
         payeeName
+        # payeeBankName
+        # referenceId
       }
-      # Include all necessary fields for display
     }
   }
 `;
@@ -142,16 +169,66 @@ export const GET_CATEGORY_SPENDING_SUMMARY_QUERY = gql`
     $dateFrom: DateTime
     $dateTo: DateTime
   ) {
-    # This query 'categorySpendingSummary' needs to be implemented on your backend.
-    # It's a custom query that would likely aggregate transaction data.
     categorySpendingSummary(dateFrom: $dateFrom, dateTo: $dateTo) {
       category
-      totalAmount # This should be Decimal from backend, map to string/number in frontend
-      # percentage # Backend can calculate this or frontend can
+      totalAmount
     }
   }
 `;
 // === END ANALYTICS QUERIES ===
 
+// === QUERY FOR TRANSACTION DETAILS ===
+export const GET_TRANSACTION_DETAILS_QUERY = gql`
+  query GetTransactionDetails($id: ID!) {
+    transaction(id: $id) {
+      id
+      amount # Decimal
+      transactionType
+      timestamp # DateTime
+      notes
+      category
+      createdAt # DateTime
+      # Payer information (optional, but useful for context)
+      # payer {
+      #   id
+      #   firstName
+      #   lastName
+      # }
+      # Specific details based on type
+      upiDetails {
+        id
+        payeeName
+        payeeUpiId
+        payerUpiAccount { # For displaying "Paid from Account X"
+          id
+          displayName
+          upiId
+        }
+      }
+      cardDetails {
+        id
+        payeeMerchantName
+        payerCardAccount { # For displaying "Paid from Card ending in XXXX"
+          id
+          cardLast4Digits
+          cardType
+        }
+      }
+      netBankingDetails {
+        id
+        payeeName
+        payeeBankName
+        referenceId
+        payerBankAccount { # For displaying "Paid from Bank Account YYYY"
+          id
+          bankName
+          accountNumberLast4
+        }
+      }
+    }
+  }
+`;
+
+// === END TRANSACTION DETAILS QUERY ===
 
 // Add other queries/mutations as needed

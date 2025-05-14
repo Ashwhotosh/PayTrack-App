@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [loginUser, { loading, error }] = useLoginMutation({
     onCompleted: async (data) => {
       // 'data' is now strongly typed as LoginMutation | null | undefined
+       console.log("LOGIN SUCCEEDED - onCompleted called with data:", JSON.stringify(data, null, 2)); // <<< ADD THIS
       if (data?.login?.token && data.login.user) {
         // Important: Ensure the fields selected in your LOGIN_MUTATION in operations.ts
         // and returned by data.login.user are compatible with your AuthUser type.
