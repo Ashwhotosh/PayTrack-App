@@ -68,7 +68,7 @@ export const UPDATE_TRANSACTION_CATEGORY_MUTATION = gql`
       notes
       timestamp
       transactionType # Payment method
-      flow # <<< ADDED (CREDIT/DEBIT flow)
+      flow
       upiDetails {
         id
       }
@@ -88,7 +88,7 @@ export const CREATE_TRANSACTION_MUTATION = gql`
       id
       amount
       transactionType # Payment method
-      flow # <<< ADDED (CREDIT/DEBIT flow)
+      flow
       notes
       timestamp
       upiDetails {
@@ -129,8 +129,6 @@ export const GET_MY_UPI_ACCOUNTS_QUERY = gql`
     }
   }
 `;
-// You would add similar queries for GET_MY_CARD_ACCOUNTS_QUERY and GET_MY_BANK_ACCOUNTS_QUERY if needed
-
 
 // === ANALYTICS QUERIES ===
 
@@ -145,49 +143,44 @@ export const GET_ANALYTICS_TRANSACTIONS_QUERY = gql`
       id
       amount
       transactionType
-      flow # <<< ADDED (CREDIT/DEBIT flow)
+      flow
       timestamp
       category
       notes
       upiDetails {
-        id # <<< ADDED
+        id
         payeeName
-        payeeUpiId # If needed for display
+        payeeUpiId
       }
       cardDetails {
-        id # <<< ADDED
+        id
         payeeMerchantName
       }
       netBankingDetails {
-        id # <<< ADDED
+        id
         payeeName
-        # payeeBankName
-        # referenceId
       }
     }
   }
 `;
 
-// This is your main transactions query, used also on the dashboard
 export const GET_DASHBOARD_TRANSACTIONS_QUERY = gql`
-  query GetDashboardTransactions( # Renamed for clarity, or keep as GetAnalyticsTransactions if preferred
+  query GetDashboardTransactions(
     $limit: Int
     $offset: Int
     $dateFrom: DateTime
     $dateTo: DateTime
-    # $filterType: TransactionType # If you had specific filter for payment method
   ) {
     transactions(
       limit: $limit,
       offset: $offset,
       dateFrom: $dateFrom,
       dateTo: $dateTo
-      # filterType: $filterType
     ) {
       id
       amount
-      transactionType # Payment method
-      flow # <<< ADDED (CREDIT/DEBIT flow)
+      transactionType
+      flow
       timestamp
       category
       notes
@@ -203,8 +196,6 @@ export const GET_DASHBOARD_TRANSACTIONS_QUERY = gql`
         id
         payeeName
       }
-      # If you derive merchantName on backend, include it:
-      # merchantName
     }
   }
 `;
@@ -220,6 +211,28 @@ export const GET_CATEGORY_SPENDING_SUMMARY_QUERY = gql`
     }
   }
 `;
+
+// --- QUERY FOR ANALYTICS WITH INSIGHT (MODIFIED) ---
+export const GET_ANALYTICS_WITH_INSIGHT_QUERY = gql`
+  query GetAnalyticsWithInsight(
+    # $dateFrom: DateTime // REMOVED - AI model uses full history
+    # $dateTo: DateTime   // REMOVED - AI model uses full history
+    $periodsAhead: Int
+    $category: String
+  ) {
+    getAnalyticsWithInsight(
+      # dateFrom: $dateFrom // REMOVED
+      # dateTo: $dateTo     // REMOVED
+      periodsAhead: $periodsAhead
+      category: $category
+    ) {
+      forecastedSpending
+      expenditureTip
+      categoryContext
+      periodsCovered
+    }
+  }
+`;
 // === END ANALYTICS QUERIES ===
 
 // === QUERY FOR TRANSACTION DETAILS ===
@@ -229,16 +242,11 @@ export const GET_TRANSACTION_DETAILS_QUERY = gql`
       id
       amount # Decimal
       transactionType # Payment method
-      flow # <<< ADDED (CREDIT/DEBIT flow)
+      flow
       timestamp # DateTime
       notes
       category
       createdAt # DateTime
-      # payer { # Uncomment if you want to show payer details
-      #   id
-      #   firstName
-      #   lastName
-      # }
       upiDetails {
         id
         payeeName

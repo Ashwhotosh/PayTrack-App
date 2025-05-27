@@ -37,6 +37,15 @@ export type AddUpiAccountInput = {
   upiId: Scalars['String']['input'];
 };
 
+/** Represents the combined output of a spending forecast and an AI-generated expenditure tip. */
+export type AnalyticsInsight = {
+  __typename?: 'AnalyticsInsight';
+  categoryContext?: Maybe<Scalars['String']['output']>;
+  expenditureTip?: Maybe<Scalars['String']['output']>;
+  forecastedSpending: Array<Scalars['Float']['output']>;
+  periodsCovered?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Payload returned after successful authentication (e.g., login, signup). */
 export type AuthPayload = {
   __typename?: 'AuthPayload';
@@ -235,6 +244,11 @@ export type Query = {
   /** Fetches a summary of spending aggregated by category within a given date range. */
   categorySpendingSummary: Array<CategorySpending>;
   /**
+   * Fetches a spending forecast and an AI-generated expenditure tip based on the user's
+   * entire transaction history (optionally filtered by category).
+   */
+  getAnalyticsWithInsight?: Maybe<AnalyticsInsight>;
+  /**
    * Fetches a real-time category suggestion for a given transaction ID.
    * Calls the external AI/ML service. Requires the transaction to exist and belong to the user.
    */
@@ -267,6 +281,16 @@ export type Query = {
 export type QueryCategorySpendingSummaryArgs = {
   dateFrom?: InputMaybe<Scalars['DateTime']['input']>;
   dateTo?: InputMaybe<Scalars['DateTime']['input']>;
+};
+
+
+/**
+ * The root query type. All read operations start here.
+ * Extend this type with additional fields in other schema files.
+ */
+export type QueryGetAnalyticsWithInsightArgs = {
+  category?: InputMaybe<Scalars['String']['input']>;
+  periodsAhead?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -514,6 +538,14 @@ export type GetCategorySpendingSummaryQueryVariables = Exact<{
 
 
 export type GetCategorySpendingSummaryQuery = { __typename?: 'Query', categorySpendingSummary: Array<{ __typename?: 'CategorySpending', category: string, totalAmount: any }> };
+
+export type GetAnalyticsWithInsightQueryVariables = Exact<{
+  periodsAhead?: InputMaybe<Scalars['Int']['input']>;
+  category?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetAnalyticsWithInsightQuery = { __typename?: 'Query', getAnalyticsWithInsight?: { __typename?: 'AnalyticsInsight', forecastedSpending: Array<number>, expenditureTip?: string | null, categoryContext?: string | null, periodsCovered?: number | null } | null };
 
 export type GetTransactionDetailsQueryVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -1050,6 +1082,50 @@ export type GetCategorySpendingSummaryQueryHookResult = ReturnType<typeof useGet
 export type GetCategorySpendingSummaryLazyQueryHookResult = ReturnType<typeof useGetCategorySpendingSummaryLazyQuery>;
 export type GetCategorySpendingSummarySuspenseQueryHookResult = ReturnType<typeof useGetCategorySpendingSummarySuspenseQuery>;
 export type GetCategorySpendingSummaryQueryResult = Apollo.QueryResult<GetCategorySpendingSummaryQuery, GetCategorySpendingSummaryQueryVariables>;
+export const GetAnalyticsWithInsightDocument = gql`
+    query GetAnalyticsWithInsight($periodsAhead: Int, $category: String) {
+  getAnalyticsWithInsight(periodsAhead: $periodsAhead, category: $category) {
+    forecastedSpending
+    expenditureTip
+    categoryContext
+    periodsCovered
+  }
+}
+    `;
+
+/**
+ * __useGetAnalyticsWithInsightQuery__
+ *
+ * To run a query within a React component, call `useGetAnalyticsWithInsightQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAnalyticsWithInsightQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAnalyticsWithInsightQuery({
+ *   variables: {
+ *      periodsAhead: // value for 'periodsAhead'
+ *      category: // value for 'category'
+ *   },
+ * });
+ */
+export function useGetAnalyticsWithInsightQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<GetAnalyticsWithInsightQuery, GetAnalyticsWithInsightQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetAnalyticsWithInsightQuery, GetAnalyticsWithInsightQueryVariables>(GetAnalyticsWithInsightDocument, options);
+      }
+export function useGetAnalyticsWithInsightLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetAnalyticsWithInsightQuery, GetAnalyticsWithInsightQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetAnalyticsWithInsightQuery, GetAnalyticsWithInsightQueryVariables>(GetAnalyticsWithInsightDocument, options);
+        }
+export function useGetAnalyticsWithInsightSuspenseQuery(baseOptions?: ApolloReactHooks.SkipToken | ApolloReactHooks.SuspenseQueryHookOptions<GetAnalyticsWithInsightQuery, GetAnalyticsWithInsightQueryVariables>) {
+          const options = baseOptions === ApolloReactHooks.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useSuspenseQuery<GetAnalyticsWithInsightQuery, GetAnalyticsWithInsightQueryVariables>(GetAnalyticsWithInsightDocument, options);
+        }
+export type GetAnalyticsWithInsightQueryHookResult = ReturnType<typeof useGetAnalyticsWithInsightQuery>;
+export type GetAnalyticsWithInsightLazyQueryHookResult = ReturnType<typeof useGetAnalyticsWithInsightLazyQuery>;
+export type GetAnalyticsWithInsightSuspenseQueryHookResult = ReturnType<typeof useGetAnalyticsWithInsightSuspenseQuery>;
+export type GetAnalyticsWithInsightQueryResult = Apollo.QueryResult<GetAnalyticsWithInsightQuery, GetAnalyticsWithInsightQueryVariables>;
 export const GetTransactionDetailsDocument = gql`
     query GetTransactionDetails($id: ID!) {
   transaction(id: $id) {
