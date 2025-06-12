@@ -282,4 +282,43 @@ export const GET_TRANSACTION_DETAILS_QUERY = gql`
 `;
 // === END TRANSACTION DETAILS QUERY ===
 
+// === QUERY FOR CHATBOT CONTEXT ===
+export const GET_USER_DATA_FOR_CHATBOT_QUERY = gql`
+  query GetUserDataForChatbot {
+    me {
+      id
+      email
+      firstName
+      lastName
+      middleName
+      phone
+      gender
+      dob
+      profession
+    }
+    transactions {
+      id
+      amount
+      flow
+      transactionType
+      category
+      notes
+      timestamp
+      upiDetails {
+        payeeName
+        payeeUpiId
+      }
+      cardDetails {
+        payeeMerchantName
+      }
+      netBankingDetails {
+        payeeName
+        referenceId
+      }
+    }
+  }
+`;
+
+// === END CHATBOT CONTEXT QUERY ===
+
 // Add other queries/mutations as needed

@@ -11,6 +11,9 @@
   "ios": "expo run:ios",
   "codegen": "graphql-codegen --config codegen.ts",
   "codegen:watch": "graphql-codegen --config codegen.ts --watch"
+},
+"overrides": {
+  "markdown-it": "^12.3.2"
 }
 ,
   "dependencies": {
@@ -55,7 +58,8 @@
     "react-native-svg": "15.8.0",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.19.13",
-    "react-native-webview": "13.12.5"
+    "react-native-webview": "13.12.5",
+    "react-native-markdown-display": "^7.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -1,12 +1,20 @@
-// app/_layout.tsx
-import { useEffect } from 'react';
-import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router'; // Removed Slot for now
+// FILE: app/_layout.tsx
+
+import { useEffect, useState } from 'react';
+import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { ApolloProvider } from '@apollo/client';
 import client from '@/lib/apolloClient';
 import { AuthProvider, useAuth } from '@/context/authContext';
-import { ActivityIndicator, View, StyleSheet } from 'react-native'; // Added StyleSheet
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
+
+// Import chatbot components
+import Chatbot from '@/components/Chatbot';
+import ChatbotFAB from '@/components/ChatbotFAB';
+
+// Import the new query hook
+import { useGetUserDataForChatbotLazyQuery } from '@/graphql/generated/graphql';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -43,54 +51,65 @@ export default function RootLayout() {
 }
 
 function LayoutController() {
-  const { token, isLoading, isAppLoading, user } = useAuth(); // Added user for logging
+  const { token, isLoading, isAppLoading, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
-  useEffect(() => {
-    const currentRoute = segments.join('/') || 'index (at root)';
-    // console.log(
-    //   `LayoutCtrl useEffect | Token: ${token ? 'YES' : 'NO'} | isLoading: ${isLoading} | isAppLoading: ${isAppLoading} | User: ${user?.email || 'None'} | Segments: ${currentRoute}`
-    // );
+  // State for chatbot
+  const [isChatbotVisible, setIsChatbotVisible] = useState(false);
+  const [chatbotContext, setChatbotContext] = useState<string | null>(null);
 
-    // If we are still in the initial app loading phase (checking async storage, etc.)
-    // or if a login/logout operation is actively in progress, wait.
+  // --- Data Fetching for Chatbot ---
+  const [fetchUserDataForChatbot, { loading: chatbotContextLoading, error: chatbotContextError }] = useGetUserDataForChatbotLazyQuery({
+    fetchPolicy: 'network-only',
+    onCompleted: (data) => {
+      if (data && data.me && data.transactions) {
+        // Format the data into the desired JSON structure
+        const structuredData = {
+          personalDetails: data.me,
+          transactionHistory: data.transactions,
+        };
+        // Convert the object to a JSON string and store it in state
+        const jsonContext = JSON.stringify(structuredData, null, 2);
+        setChatbotContext(jsonContext);
+        console.log('Chatbot context successfully loaded.');
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to load data for chatbot context:', error.message);
+      // If fetching fails, the context will remain null, and the chatbot will operate without it.
+    },
+  });
+
+  // Effect to fetch user data for the chatbot once the user is authenticated.
+  useEffect(() => {
+    // Fetch data only if there's a token and we haven't already fetched it.
+    if (token && !chatbotContext && !chatbotContextLoading) {
+      fetchUserDataForChatbot();
+    }
+    // If user logs out, clear the context.
+    if (!token && chatbotContext) {
+      setChatbotContext(null);
+    }
+  }, [token, chatbotContext, chatbotContextLoading, fetchUserDataForChatbot]);
+
+
+  // --- Redirection Logic (unchanged) ---
+  useEffect(() => {
     if (isAppLoading || isLoading) {
-      // console.log('LayoutCtrl useEffect: Exit - App/Auth state still loading.');
       return;
     }
-
     const inAuthGroup = segments[0] === '(auth)';
-    // console.log(`LayoutCtrl useEffect: In Auth Group? ${inAuthGroup}`);
-
     if (token) {
-      // User is authenticated (token exists)
       if (inAuthGroup) {
-        // Token exists, AND user is currently on an auth screen (e.g., login, signup)
-        // This happens right after a successful login/signup. Redirect to main app.
-        // console.log('LayoutCtrl useEffect: ACTION - Token exists, in auth group. Redirecting to /tabs');
         router.replace('/(tabs)');
-      } else {
-        // Token exists, and user is already outside auth group (e.g., on /tabs or a protected child route).
-        // No redirect is generally needed from here unless you want to force them to a specific screen like /tabs
-        // if they somehow landed on a non-auth, non-tabs screen while logged in.
-        // For now, this case means they are likely where they should be.
-        // console.log('LayoutCtrl useEffect: Token exists, NOT in auth group. No redirect needed from here.');
       }
     } else {
-      // No token (user is not authenticated)
       if (!inAuthGroup) {
-        // No token, AND user is NOT on an auth screen (e.g., tried to access /tabs directly or a protected route)
-        // Redirect to login.
-        console.log('LayoutCtrl useEffect: ACTION - No token, NOT in auth group. Redirecting to /login');
         router.replace('/(auth)/login');
-      } else {
-        // No token, AND user is already on an auth screen (e.g., login, signup).
-        // This is the correct state, so no redirect needed.
-        console.log('LayoutCtrl useEffect: No token, IS in auth group. No redirect needed.');
       }
     }
-  }, [token, segments, isLoading, isAppLoading, router, user]); // Added user to dep array for logging clarity
+  }, [token, segments, isLoading, isAppLoading, router, user]);
 
   if (isAppLoading || isLoading) {
     return (
@@ -100,9 +119,11 @@ function LayoutController() {
     );
   }
 
-  // If redirection logic is handled, this Stack will render based on current route
+  const inAuthGroup = segments[0] === '(auth)';
+  const showChatbotUI = token && !inAuthGroup;
+
   return (
-    <>
+    <View style={styles.rootContainer}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
@@ -110,17 +131,31 @@ function LayoutController() {
         <Stack.Screen name="payment-success" />
         <Stack.Screen name="transaction-details" />
         <Stack.Screen name="upi-payment" />
-        {/* The 'profile' group layout will handle its own screens if defined in app/profile/_layout.tsx */}
-        {/* If profile screens are top-level and not in a group, list them here */}
         <Stack.Screen name="profile" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="light" />
-    </>
+
+      {showChatbotUI && (
+        <>
+            <ChatbotFAB onPress={() => setIsChatbotVisible(true)} />
+            <Chatbot
+              visible={isChatbotVisible}
+              onClose={() => setIsChatbotVisible(false)}
+              // Pass the user data context to the chatbot component
+              userContext={chatbotContext}
+            />
+        </>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

@@ -1,4 +1,3 @@
-// graphql/generated/graphql.tsx
 import { gql } from '@apollo/client';
 import * as Apollo from '@apollo/client';
 import * as ApolloReactHooks from '@apollo/client';
@@ -554,6 +553,11 @@ export type GetTransactionDetailsQueryVariables = Exact<{
 
 
 export type GetTransactionDetailsQuery = { __typename?: 'Query', transaction?: { __typename?: 'Transaction', id: string, amount: any, transactionType: TransactionType, flow: TransactionFlow, timestamp: any, notes?: string | null, category?: string | null, createdAt: any, upiDetails?: { __typename?: 'UPITransaction', id: string, payeeName: string, payeeUpiId: string, payerUpiAccount: { __typename?: 'UserUpiAccount', id: string, displayName: string, upiId: string } } | null, cardDetails?: { __typename?: 'CardTransaction', id: string, payeeMerchantName: string, payerCardAccount: { __typename?: 'UserCardAccount', id: string, cardLast4Digits: string, cardType: string } } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', id: string, payeeName: string, payeeBankName: string, referenceId: string, payerBankAccount: { __typename?: 'UserBankAccount', id: string, bankName: string, accountNumberLast4: string } } | null } | null };
+
+export type GetUserDataForChatbotQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetUserDataForChatbotQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, middleName?: string | null, phone?: string | null, gender?: Gender | null, dob?: any | null, profession?: string | null } | null, transactions: Array<{ __typename?: 'Transaction', id: string, amount: any, flow: TransactionFlow, transactionType: TransactionType, category?: string | null, notes?: string | null, timestamp: any, upiDetails?: { __typename?: 'UPITransaction', payeeName: string, payeeUpiId: string } | null, cardDetails?: { __typename?: 'CardTransaction', payeeMerchantName: string } | null, netBankingDetails?: { __typename?: 'NetBankingTransaction', payeeName: string, referenceId: string } | null }> };
 
 
 export const LoginDocument = gql`
@@ -1204,3 +1208,70 @@ export type GetTransactionDetailsQueryHookResult = ReturnType<typeof useGetTrans
 export type GetTransactionDetailsLazyQueryHookResult = ReturnType<typeof useGetTransactionDetailsLazyQuery>;
 export type GetTransactionDetailsSuspenseQueryHookResult = ReturnType<typeof useGetTransactionDetailsSuspenseQuery>;
 export type GetTransactionDetailsQueryResult = Apollo.QueryResult<GetTransactionDetailsQuery, GetTransactionDetailsQueryVariables>;
+export const GetUserDataForChatbotDocument = gql`
+    query GetUserDataForChatbot {
+  me {
+    id
+    email
+    firstName
+    lastName
+    middleName
+    phone
+    gender
+    dob
+    profession
+  }
+  transactions {
+    id
+    amount
+    flow
+    transactionType
+    category
+    notes
+    timestamp
+    upiDetails {
+      payeeName
+      payeeUpiId
+    }
+    cardDetails {
+      payeeMerchantName
+    }
+    netBankingDetails {
+      payeeName
+      referenceId
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetUserDataForChatbotQuery__
+ *
+ * To run a query within a React component, call `useGetUserDataForChatbotQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetUserDataForChatbotQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetUserDataForChatbotQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetUserDataForChatbotQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<GetUserDataForChatbotQuery, GetUserDataForChatbotQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetUserDataForChatbotQuery, GetUserDataForChatbotQueryVariables>(GetUserDataForChatbotDocument, options);
+      }
+export function useGetUserDataForChatbotLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetUserDataForChatbotQuery, GetUserDataForChatbotQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetUserDataForChatbotQuery, GetUserDataForChatbotQueryVariables>(GetUserDataForChatbotDocument, options);
+        }
+export function useGetUserDataForChatbotSuspenseQuery(baseOptions?: ApolloReactHooks.SkipToken | ApolloReactHooks.SuspenseQueryHookOptions<GetUserDataForChatbotQuery, GetUserDataForChatbotQueryVariables>) {
+          const options = baseOptions === ApolloReactHooks.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useSuspenseQuery<GetUserDataForChatbotQuery, GetUserDataForChatbotQueryVariables>(GetUserDataForChatbotDocument, options);
+        }
+export type GetUserDataForChatbotQueryHookResult = ReturnType<typeof useGetUserDataForChatbotQuery>;
+export type GetUserDataForChatbotLazyQueryHookResult = ReturnType<typeof useGetUserDataForChatbotLazyQuery>;
+export type GetUserDataForChatbotSuspenseQueryHookResult = ReturnType<typeof useGetUserDataForChatbotSuspenseQuery>;
+export type GetUserDataForChatbotQueryResult = Apollo.QueryResult<GetUserDataForChatbotQuery, GetUserDataForChatbotQueryVariables>;
