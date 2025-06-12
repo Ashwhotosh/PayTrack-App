@@ -7,7 +7,8 @@ import { QrCode, X as XIcon, Camera as FlipCamera } from 'lucide-react-native';
 
 export default function ScanPage() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [type, setType] = useState<'front' | 'back'>('back');
+  // FIX: Renamed 'type' to 'facing' for clarity and to match the prop name
+  const [facing, setFacing] = useState<'front' | 'back'>('back');
 
   useEffect(() => {
     (async () => {
@@ -62,12 +63,13 @@ export default function ScanPage() {
     );
   }
 
+  // FIX: Removed the invalid 'default' key from Platform.select
   const CameraComponent = Platform.select({
     native: () => (
       <CameraView
         style={styles.camera}
-        type={type}
-        onBarCodeScanned={handleBarCodeScanned}
+        facing={facing}
+        onBarcodeScanned={handleBarCodeScanned}
       >
         <View style={styles.overlay}>
           <View style={styles.scanArea}>
@@ -80,7 +82,6 @@ export default function ScanPage() {
         </View>
       </CameraView>
     ),
-    default: () => null,
   });
 
   return (
@@ -91,13 +92,14 @@ export default function ScanPage() {
       </View>
 
       <View style={styles.cameraContainer}>
-        {CameraComponent()}
+        {CameraComponent && CameraComponent()}
       </View>
 
       <View style={styles.controls}>
         <TouchableOpacity
           style={styles.controlButton}
-          onPress={() => setType(type === 'back' ? 'front' : 'back')}
+          // FIX: Updated state setter logic for the renamed 'facing' state
+          onPress={() => setFacing(facing === 'back' ? 'front' : 'back')}
         >
           <FlipCamera color="#fff" size={24} />
           <Text style={styles.buttonText}>Flip</Text>
@@ -115,6 +117,7 @@ export default function ScanPage() {
   );
 }
 
+// ... styles remain unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,

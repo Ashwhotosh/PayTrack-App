@@ -289,9 +289,7 @@ export default function AnalyticsPage() {
         },
       })
         .catch((err) => {
-          // .finally or .then can also be used to reset isLoadingMoreTransactions
           console.error('Failed to fetch more transactions:', err);
-          // setTransactionsError("Failed to load more."); // Error state already handled by hook's onError
         })
         .finally(() => {
           setIsLoadingMoreTransactions(false);
@@ -542,6 +540,26 @@ export default function AnalyticsPage() {
                     : 'Last 90 Days'}
                   )
                 </Text>
+
+                {/* --- TOTAL EXPENDITURE CARD --- */}
+                {!categorySummaryHookLoading &&
+                  categorySpendingData.length > 0 && (
+                    <View style={styles.totalExpenditureCard}>
+                      <Text style={styles.totalExpenditureLabel}>
+                        Total Expenditure
+                      </Text>
+                      <Text style={styles.totalExpenditureValue}>
+                        ₹
+                        {categorySpendingData
+                          .reduce((sum, item) => sum + item.amount, 0)
+                          .toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                      </Text>
+                    </View>
+                  )}
+
                 {categorySummaryHookLoading && (
                   <ActivityIndicator
                     size="large"
@@ -601,10 +619,28 @@ export default function AnalyticsPage() {
                     forecastData &&
                     forecastData.length > 0 && (
                       <View>
-                        <Text style={styles.forecastText}>
-                          Forecasted: ₹
-                          {forecastData.map((f) => f.toFixed(0)).join(', ₹')}
-                        </Text>
+                        {forecastData.map((value, index) => (
+                          <View key={index} style={styles.forecastRow}>
+                            <Text style={styles.forecastLabel}>
+                              Week {index + 1}
+                            </Text>
+                            <Text style={styles.forecastValue}>
+                              ₹{value.toLocaleString('en-IN')}
+                            </Text>
+                          </View>
+                        ))}
+                        <View style={styles.forecastSeparator} />
+                        <View style={styles.forecastTotalContainer}>
+                          <Text style={styles.forecastTotalLabel}>
+                            Monthly Expenditure
+                          </Text>
+                          <Text style={styles.forecastTotalValue}>
+                            ₹
+                            {forecastData
+                              .reduce((sum, val) => sum + val, 0)
+                              .toLocaleString('en-IN')}
+                          </Text>
+                        </View>
                       </View>
                     )}
                   {!insightHookLoading &&
@@ -629,28 +665,7 @@ export default function AnalyticsPage() {
                 )}
               </>
             )}
-            {viewType === 'actual' && (
-              <View style={styles.insightsSection}>
-                <Text style={styles.sectionTitle}>
-                  General Insights (
-                  {timeRange === '7d'
-                    ? 'Last 7 Days'
-                    : timeRange === '30d'
-                    ? 'Last 30 Days'
-                    : 'Last 90 Days'}
-                  )
-                </Text>
-                <View style={styles.insightCard}>
-                  <View style={styles.insightHeader}>
-                    <TrendingUp color="#4CAF50" size={24} />
-                    <Text style={styles.insightTitle}>Spending Trend</Text>
-                  </View>
-                  <Text style={styles.insightText}>
-                    Your spending analysis will appear here.
-                  </Text>
-                </View>
-              </View>
-            )}
+            {/* The General Insights section was here but empty, removing for brevity */}
           </View>
         )}
       </ScrollView>
@@ -740,19 +755,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#e0e0e0',
     fontFamily: 'Inter-SemiBold',
-    marginBottom: 12,
+    marginBottom: 16, // Increased margin
   },
   forecastSection: {
     marginBottom: 24,
     padding: 16,
     backgroundColor: '#2a2a2a',
     borderRadius: 12,
-  },
-  forecastText: {
-    fontSize: 15,
-    color: '#ccc',
-    fontFamily: 'Inter-Regular',
-    lineHeight: 22,
   },
   tipSection: {
     marginBottom: 24,
@@ -768,21 +777,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     lineHeight: 22,
   },
-  insightsSection: { marginBottom: 32 },
-  insightCard: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  insightHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  insightTitle: { fontSize: 16, color: '#fff', fontFamily: 'Inter-SemiBold' },
-  insightText: { fontSize: 14, color: '#999', fontFamily: 'Inter-Regular' },
   loader: { marginVertical: 20 },
   errorText: {
     color: '#FF6B6B',
@@ -798,13 +792,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
   },
-  placeholderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  placeholderText: { color: '#666', fontSize: 16, fontFamily: 'Inter-Regular' },
   transactionsListContainer: { paddingHorizontal: 20, paddingTop: 10 },
   transactionItemContainer: {
     flexDirection: 'row',
@@ -859,4 +846,62 @@ const styles = StyleSheet.create({
   debitAmount: { color: '#FF7675' },
   creditAmount: { color: '#55E6C1' },
   separator: { height: 0 },
+  // --- New and Modified Styles for Forecast ---
+  forecastRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  forecastLabel: {
+    fontSize: 15,
+    color: '#ccc',
+    fontFamily: 'Inter-Regular',
+  },
+  forecastValue: {
+    fontSize: 15,
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+  },
+  forecastSeparator: {
+    height: 1,
+    backgroundColor: '#444',
+    marginVertical: 12,
+  },
+  forecastTotalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  forecastTotalLabel: {
+    fontSize: 16,
+    color: '#e0e0e0',
+    fontFamily: 'Inter-Bold',
+  },
+  forecastTotalValue: {
+    fontSize: 16,
+    color: '#8e44ad',
+    fontFamily: 'Inter-Bold',
+  },
+  // --- New Styles for Total Expenditure Card ---
+  totalExpenditureCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  totalExpenditureLabel: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#e0e0e0',
+  },
+  totalExpenditureValue: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+  },
 });

@@ -1,3 +1,4 @@
+// graphql/generated/graphql.tsx
 import { gql } from '@apollo/client';
 import * as Apollo from '@apollo/client';
 import * as ApolloReactHooks from '@apollo/client';

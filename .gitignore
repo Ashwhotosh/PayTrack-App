@@ -38,3 +38,10 @@ yarn-error.*
 
 # android build
 android
+
+# custom files
+combineFiles.ts
+generate-structure.ts
+project-structure.txt
+project.txt
+jdk-17.0.2

@@ -1,7 +1,7 @@
 // app/(tabs)/_layout.tsx
 import { Tabs } from 'expo-router';
 import {
-  Chrome as Home,
+  Home as Home,
   ChartBar as BarChart2,
   QrCode,
   Gift,
@@ -21,7 +21,8 @@ export default function TabLayout() {
         },
         tabBarActiveTintColor: '#8e44ad',
         tabBarInactiveTintColor: '#666',
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
